@@ -8,9 +8,11 @@ LABEL name="develop:dng-converter"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update
-
-RUN apt-get -y install sudo
+# Every apt-get install refreshes the package index in the same layer: an
+# index cached in a layer of its own goes stale as soon as Ubuntu publishes
+# new versions, and then the next install fails, e.g. in CI, whose layer cache
+# lasts for weeks.
+RUN apt-get update && apt-get -y install sudo
 RUN echo 'root:docker' | chpasswd                      # Update user root password.
 
 # ubuntu:24.04 ships a default 'ubuntu' user at uid/gid 1000. Remove it so
@@ -31,18 +33,18 @@ RUN echo 'developer:developer' | chpasswd              # Update user developer p
 RUN usermod -aG sudo developer                          # Add user to sudoers.
 
 # The C++ toolchain and the build system.
-RUN apt-get install -y --no-install-recommends build-essential cmake ninja-build pkg-config git
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential cmake ninja-build pkg-config git
 
 # LibRaw decodes the camera RAW files (CR2 and every other format it knows).
-RUN apt-get install -y --no-install-recommends libraw-dev
+RUN apt-get update && apt-get install -y --no-install-recommends libraw-dev
 
 # Testing: GoogleTest for the unit tests; curl to download the sample RAW
 # files; exiftool to inspect and validate the DNG files by hand and in the
 # tests.
-RUN apt-get install -y --no-install-recommends libgtest-dev curl ca-certificates libimage-exiftool-perl
+RUN apt-get update && apt-get install -y --no-install-recommends libgtest-dev curl ca-certificates libimage-exiftool-perl
 
 # Formatting, the same major version of clang-format as the host.
-RUN apt-get install -y --no-install-recommends clang-format pre-commit
+RUN apt-get update && apt-get install -y --no-install-recommends clang-format pre-commit
 
 # The container user is in the sudo group, but a password prompt makes the
 # scripts in ./bin unusable from a non-interactive shell, e.g.
