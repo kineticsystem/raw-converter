@@ -8,7 +8,7 @@ Where we are, what is needed from Giovanni, and what comes next. Last updated 20
 - Our DNG of the public 5D Mark III sample has the same raw data as Adobe DNG Converter 9.8's DNG of the same file, and the same crop, colour matrix, white balance and camera traits (`tests/test_adobe_reference.cpp`).
 - `docs/ARCHITECTURE.md`, `README.md`, `docker/README.md` and `THIRD_PARTY_LICENSES.md` are written.
 - Nothing has been opened in Lightroom yet.
-- The folder is not a Git repository yet.
+- The code is on GitHub, in the private repository [kineticsystem/dng-converter](https://github.com/kineticsystem/dng-converter), branch `main`.
 
 ## Needed from Giovanni
 
@@ -32,7 +32,8 @@ Where we are, what is needed from Giovanni, and what comes next. Last updated 20
   - and, for reference, `--bad-pixels off`
 
   At 100% zoom in Lightroom, check that the hot pixels are gone in the first two. One is at row 361, column 4070 of the raw image (red, about 15 times its neighbours).
-- [ ] **The GitHub repository.** Its owner and name: the README assumes `kineticsystem/dng-converter`. Also: should `TODO.md` stay in the repo, or be ignored like `task.md` in the StepIt repos?
+- [x] **The GitHub repository**: [kineticsystem/dng-converter](https://github.com/kineticsystem/dng-converter), private.
+- [ ] Should `TODO.md` stay in the repo, or be ignored like `task.md` in the StepIt repos?
 - [ ] **Any 450D raw files of your own**, if you have some, to add to `~/Downloads/cr2` for the tests.
 
 ## Next, for us
@@ -45,7 +46,7 @@ Where we are, what is needed from Giovanni, and what comes next. Last updated 20
 
 ### Repository and CI
 
-- [ ] `git init`, first commit, push to GitHub.
+- [x] `git init`, first commit, push to GitHub.
 - [ ] GitHub Actions workflow:
   - build the image from `docker/Dockerfile`;
   - cache `samples/` by the checksums in `bin/fetch-samples.sh`;
