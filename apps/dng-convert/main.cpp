@@ -1,0 +1,166 @@
+// Copyright (c) 2026 Giovanni Remigi
+// SPDX-License-Identifier: MIT
+
+// dng-convert: converts a raw file, or a folder of them, to DNG.
+
+#include <atomic>
+#include <csignal>
+#include <fstream>
+#include <iostream>
+#include <string>
+#include <vector>
+
+#include "cli_options.hpp"
+#include "dngconv/dngconv.hpp"
+
+namespace
+{
+
+// The converter Ctrl-C cancels: the files being converted are finished, the
+// others are not started. Converter::cancel() only stores to a lock-free
+// atomic, which a signal handler may do.
+std::atomic<dngconv::Converter*> running{ nullptr };
+
+void onInterrupt(int)
+{
+  if (dngconv::Converter* converter = running.load())
+  {
+    converter->cancel();
+  }
+}
+
+void printResult(const dngconv::ConvertResult& r, size_t done, size_t total, bool quiet)
+{
+  const std::string counter = "[" + std::to_string(done) + "/" + std::to_string(total) + "] ";
+  using Status = dngconv::ConvertResult::Status;
+  switch (r.status)
+  {
+    case Status::CONVERTED:
+      if (!quiet)
+      {
+        std::cout << counter << r.input.string() << " -> " << r.output.string();
+        if (r.bad_pixels_fixed > 0)
+        {
+          std::cout << " (" << r.bad_pixels_fixed << " bad pixel" << (r.bad_pixels_fixed > 1 ? "s" : "") << ")";
+        }
+        std::cout << std::endl;
+      }
+      break;
+    case Status::SKIPPED:
+      if (!quiet)
+      {
+        std::cout << counter << r.input.string() << ": skipped, " << r.output.string() << " exists (use --overwrite)"
+                  << std::endl;
+      }
+      break;
+    case Status::CANCELLED:
+      break;
+    case Status::FAILED:
+      std::cerr << counter << r.input.string() << ": " << r.error << std::endl;
+      break;
+  }
+}
+
+int run(const dngconv::cli::CliOptions& cli)
+{
+  dngconv::ConvertOptions options = cli.convert;
+  options.dng.software = std::string("dng-converter ") + DNGCONV_VERSION;
+
+  const auto jobs = dngconv::planJobs(cli.input, cli.output, cli.recursive);
+  if (jobs.empty())
+  {
+    std::cerr << "No raw files in " << cli.input.string() << '\n';
+    return 1;
+  }
+  if (cli.auto_bad_pixel_mode)
+  {
+    options.bad_pixels = dngconv::cli::autoBadPixelMode(jobs.size());
+  }
+
+  dngconv::Converter converter(options);
+  if (cli.defect_map && std::filesystem::exists(*cli.defect_map))
+  {
+    std::ifstream in(*cli.defect_map);
+    if (!in)
+    {
+      throw dngconv::Error(cli.defect_map->string() + ": cannot open");
+    }
+    converter.defectMap().read(in);
+  }
+
+  running = &converter;
+  std::signal(SIGINT, onInterrupt);
+  const auto results = converter.convert(jobs, [&](const dngconv::ConvertResult& r, size_t done, size_t total) {
+    printResult(r, done, total, cli.quiet);
+  });
+  std::signal(SIGINT, SIG_DFL);
+  running = nullptr;
+
+  if (cli.defect_map)
+  {
+    std::ofstream out(*cli.defect_map, std::ios::trunc);
+    converter.defectMap().write(out, options.batch_min_scenes, options.batch_min_fraction);
+    if (!out)
+    {
+      throw dngconv::Error(cli.defect_map->string() + ": cannot write");
+    }
+  }
+
+  size_t counts[4] = {};
+  for (const auto& r : results)
+  {
+    ++counts[static_cast<int>(r.status)];
+  }
+  using Status = dngconv::ConvertResult::Status;
+  if (!cli.quiet)
+  {
+    std::cout << counts[static_cast<int>(Status::CONVERTED)] << " converted, "
+              << counts[static_cast<int>(Status::SKIPPED)] << " skipped, " << counts[static_cast<int>(Status::FAILED)]
+              << " failed";
+    if (counts[static_cast<int>(Status::CANCELLED)] > 0)
+    {
+      std::cout << ", " << counts[static_cast<int>(Status::CANCELLED)] << " cancelled";
+    }
+    std::cout << std::endl;
+  }
+  if (counts[static_cast<int>(Status::FAILED)] > 0)
+  {
+    return 1;
+  }
+  return counts[static_cast<int>(Status::CANCELLED)] > 0 ? 130 : 0;
+}
+
+}  // namespace
+
+int main(int argc, char** argv)
+{
+  dngconv::cli::CliOptions cli;
+  try
+  {
+    cli = dngconv::cli::parseCommandLine(std::vector<std::string>(argv + 1, argv + argc));
+  }
+  catch (const std::invalid_argument& e)
+  {
+    std::cerr << "dng-convert: " << e.what() << "\n\n" << dngconv::cli::usage();
+    return 2;
+  }
+  if (cli.help)
+  {
+    std::cout << dngconv::cli::usage();
+    return 0;
+  }
+  if (cli.version)
+  {
+    std::cout << "dng-convert " << DNGCONV_VERSION << " (LibRaw " << dngconv::librawVersion() << ")\n";
+    return 0;
+  }
+  try
+  {
+    return run(cli);
+  }
+  catch (const std::exception& e)
+  {
+    std::cerr << "dng-convert: " << e.what() << '\n';
+    return 1;
+  }
+}

@@ -1,0 +1,15 @@
+# CMake
+build
+compile_commands.json
+.cache
+
+# VSCode
+.vscode
+
+# The sample raw files, downloaded by bin/fetch-samples.sh. The folder itself
+# is kept, so that Docker does not create it as root when it mounts the repo.
+samples/*
+!samples/.gitkeep
+
+# The local settings of the development container, e.g. DNG_USER_SAMPLES.
+docker/.env

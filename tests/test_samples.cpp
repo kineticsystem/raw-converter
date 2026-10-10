@@ -1,0 +1,120 @@
+// Copyright (c) 2026 Giovanni Remigi
+// SPDX-License-Identifier: MIT
+
+// End to end, on real raw files: those of bin/fetch-samples.sh, and any other
+// folder listed in DNGCONV_SAMPLE_DIRS. Skipped when there are none.
+
+#include <gtest/gtest.h>
+
+#include "dngconv/dngconv.hpp"
+#include "libraw_readback.hpp"
+#include "test_support.hpp"
+#include "tiff/tiff_reader.hpp"
+
+namespace dngconv::test
+{
+namespace
+{
+
+class Samples : public ::testing::TestWithParam<std::filesystem::path>
+{
+};
+
+std::string uniqueCameraModel(const std::vector<uint8_t>& dng)
+{
+  auto reader = tiff::TiffReader::open(dng.data(), dng.size());
+  auto entry = reader->find(reader->firstIfdOffset(), 50708);
+  return std::string(reinterpret_cast<const char*>(dng.data() + entry->value_offset), entry->value_size - 1);
+}
+
+TEST_P(Samples, ConvertsLosslessly)
+{
+  const auto input = GetParam();
+  TempDir dir;
+  const auto output = dir.path() / "out.dng";
+
+  ConvertOptions options;
+  options.bad_pixels = BadPixelMode::PER_IMAGE;
+  options.repair = BadPixelRepair::INTERPOLATE;
+  Converter converter(options);
+  const ConvertResult result = converter.convertFile(input, output);
+  ASSERT_EQ(result.status, ConvertResult::Status::CONVERTED) << result.error;
+
+  const auto dng_bytes = LocalFileStore().read(output);
+  const Decoded original = readBack(LocalFileStore().read(input));
+  const Decoded dng = readBack(dng_bytes);
+
+  ASSERT_EQ(dng.width, original.width);
+  ASSERT_EQ(dng.height, original.height);
+  ASSERT_EQ(dng.samples, original.samples);
+  size_t differences = 0;
+  for (size_t i = 0; i < original.data.size(); ++i)
+  {
+    differences += dng.data[i] != original.data[i];
+  }
+  // Only the repaired pixels differ.
+  EXPECT_EQ(differences, result.bad_pixels_fixed);
+  if (original.samples == 1)
+  {
+    EXPECT_EQ(dng.cfa_colors, original.cfa_colors);
+    for (int i = 0; i < 4; ++i)
+    {
+      EXPECT_NEAR(dng.black[i], original.black[i], 1) << "cell " << i;
+    }
+  }
+  for (int c = 0; c < 3; ++c)
+  {
+    EXPECT_NEAR(dng.neutral_mul[c], original.neutral_mul[c], 1e-3);
+  }
+
+  // Lightroom finds its camera profiles by UniqueCameraModel, and knows each
+  // camera by one name only, whatever the market it was sold in.
+  const std::string model = uniqueCameraModel(dng_bytes);
+  const std::string name = input.filename().string();
+  if (name.find("Rebel_XSi") != std::string::npos || name.find("450D") != std::string::npos)
+  {
+    EXPECT_EQ(model, "Canon EOS 450D");
+  }
+  if (name.find("5D_Mark_III") != std::string::npos)
+  {
+    EXPECT_EQ(model, "Canon EOS 5D Mark III");
+  }
+  else if (name.find("5D_Mark_II") != std::string::npos)
+  {
+    EXPECT_EQ(model, "Canon EOS 5D Mark II");
+  }
+}
+
+TEST_P(Samples, OpcodeRepairKeepsEveryValue)
+{
+  // The opcode route, which keeps every value: the data must then be exact.
+  const auto input = GetParam();
+  TempDir dir;
+  ConvertOptions options;
+  options.repair = BadPixelRepair::OPCODE;
+  Converter converter(options);
+  const ConvertResult result = converter.convertFile(input, dir.path() / "out.dng");
+  ASSERT_EQ(result.status, ConvertResult::Status::CONVERTED) << result.error;
+  const Decoded original = readBack(LocalFileStore().read(input));
+  const Decoded dng = readBack(LocalFileStore().read(dir.path() / "out.dng"));
+  EXPECT_EQ(dng.data, original.data);
+}
+
+std::string sampleName(const ::testing::TestParamInfo<std::filesystem::path>& info)
+{
+  std::string name = info.param.stem().string();
+  for (auto& c : name)
+  {
+    if (!std::isalnum(static_cast<unsigned char>(c)))
+    {
+      c = '_';
+    }
+  }
+  return name + "_" + std::to_string(info.index);
+}
+
+INSTANTIATE_TEST_SUITE_P(RawFiles, Samples, ::testing::ValuesIn(sampleFiles()), sampleName);
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(Samples);
+
+}  // namespace
+}  // namespace dngconv::test

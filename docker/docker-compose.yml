@@ -1,0 +1,28 @@
+# Definition of the development container. Driven by ./dock.sh, which supplies
+# CONTAINER_NAME and USER_UID/USER_GID.
+
+services:
+  dev:
+    build:
+      context: .
+      # On the host network, so that the image build reaches the local package
+      # cache on 127.0.0.1:3142 when it runs (see dock.sh).
+      network: host
+      args:
+        # A uid/gid matching the host user keeps the bind-mounted workspace
+        # writable and correctly owned on the host.
+        USER_UID: ${USER_UID:-1000}
+        USER_GID: ${USER_GID:-1000}
+    image: ${CONTAINER_NAME:-dng-converter}:latest
+    container_name: ${CONTAINER_NAME:-dng-converter}
+    hostname: ${CONTAINER_NAME:-dng-converter}
+    volumes:
+      # Relative paths resolve against this file's directory, so this is the
+      # repo root whatever machine it is checked out on.
+      - ..:/home/developer/ws
+      # More raw files to test with, read only, e.g. your own: set
+      # DNG_USER_SAMPLES to their folder on the host before `dock.sh build`.
+      # Without it, this is the repo's own samples folder again.
+      - ${DNG_USER_SAMPLES:-../samples}:/home/developer/user-samples:ro
+    # Keep the container alive so shells can be attached to it on demand.
+    command: sleep infinity

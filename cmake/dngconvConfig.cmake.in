@@ -1,0 +1,10 @@
+@PACKAGE_INIT@
+
+# The library links LibRaw privately; a static build still needs it found.
+include(CMakeFindDependencyMacro)
+find_dependency(Threads)
+find_dependency(PkgConfig)
+pkg_check_modules(LIBRAW REQUIRED IMPORTED_TARGET libraw_r)
+
+include("${CMAKE_CURRENT_LIST_DIR}/dngconvTargets.cmake")
+check_required_components(dngconv)
