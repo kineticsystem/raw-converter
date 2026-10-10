@@ -1,0 +1,25 @@
+# This is a format job. Pre-commit has a first-party GitHub action, so we use
+# that: https://github.com/pre-commit/action
+#
+# It runs the hooks of .pre-commit-config.yaml on every file. clang-format is
+# a system hook: the runner's Ubuntu 24.04 has the same major version, 18, as
+# the development container, so files are formatted the same way in both.
+
+name: Format
+
+on: [push, pull_request]
+
+jobs:
+  pre-commit:
+    name: Format
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install system hooks
+        run: sudo apt-get update -qq && sudo apt-get install -qq clang-format
+      - uses: pre-commit/action@v3.0.1
+        with:
+          extra_args: --all-files

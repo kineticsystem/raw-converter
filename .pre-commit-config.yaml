@@ -1,0 +1,47 @@
+exclude: ^(build|samples)/
+
+# To use:
+#
+#     pre-commit run -a
+#
+# Or:
+#
+#     pre-commit install  # (runs every time you commit in git)
+#
+# To update this file:
+#
+#     pre-commit autoupdate
+#
+# See https://github.com/pre-commit/pre-commit
+repos:
+  # Standard hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.3.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-case-conflict
+      - id: check-executables-have-shebangs
+      - id: check-merge-conflict
+      - id: check-shebang-scripts-are-executable
+      - id: check-symlinks
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: trailing-whitespace
+      - id: fix-byte-order-marker
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.1.0
+    hooks:
+      - id: codespell
+        args: ["--write-changes"] # Add '-L', 'word1,word2' to ignore words that codespell takes for misspellings.
+
+  - repo: local
+    hooks:
+      - id: clang-format
+        name: clang-format
+        description: Format files with ClangFormat.
+        entry: clang-format
+        language: system
+        files: ^(include|src|apps|tests)/.*\.(c|cc|cxx|cpp|h|hpp|hxx)$
+        args: ["-fallback-style=none", "-i"]

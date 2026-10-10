@@ -1,6 +1,7 @@
 # DNG converter  <!-- omit in toc -->
 
 [![CI](https://github.com/kineticsystem/dng-converter/actions/workflows/ci.yml/badge.svg)](https://github.com/kineticsystem/dng-converter/actions/workflows/ci.yml)
+[![Format](https://github.com/kineticsystem/dng-converter/actions/workflows/ci-format.yml/badge.svg)](https://github.com/kineticsystem/dng-converter/actions/workflows/ci-format.yml)
 
 ## Table of Contents <!-- omit in toc -->
 
@@ -9,6 +10,7 @@
 - [Prerequisites](#prerequisites)
 - [Install dng-converter](#install-dng-converter)
   - [Check out the Git Repository](#check-out-the-git-repository)
+  - [Pre-Commit Hooks](#pre-commit-hooks)
   - [Build the Project](#build-the-project)
 - [Converting Files](#converting-files)
   - [Options](#options)
@@ -69,6 +71,21 @@ sudo sh get-docker.sh
 git clone git@github.com:kineticsystem/dng-converter.git
 cd dng-converter
 ```
+
+### Pre-Commit Hooks
+
+Additionally, you should install git pre-commit hooks using the following command:
+
+```
+pre-commit install
+```
+
+The hooks, in [`.pre-commit-config.yaml`](.pre-commit-config.yaml), are:
+- the standard checks of files and whitespace;
+- codespell;
+- clang-format, with the [`.clang-format`](.clang-format) of the StepIt projects.
+
+clang-format runs as installed, so it is best to commit from the container, which has `pre-commit` and clang-format 18, the version the Format workflow uses. `pre-commit run -a` checks every file.
 
 ### Build the Project
 
@@ -225,7 +242,14 @@ dng-converter is under the [MIT licence](LICENSE). The third-party software it u
 
 ## Continuous Integration
 
-The workflow [`ci.yml`](.github/workflows/ci.yml) runs on every push and pull request. It runs in the same container as development:
+Two GitHub Actions workflows run on every push and pull request:
+
+| Workflow | What it checks |
+|---|---|
+| [`ci.yml`](.github/workflows/ci.yml) | Builds the library, the tool and the tests, and runs the tests. |
+| [`ci-format.yml`](.github/workflows/ci-format.yml) | The pre-commit hooks, on every file: the checks of files and whitespace, codespell and clang-format. |
+
+`ci.yml` runs in the same container as development:
 - it builds the image of [`docker/Dockerfile`](docker/Dockerfile), with its layers kept in the Actions cache;
 - it downloads the sample raw files, also cached, until `bin/fetch-samples.sh` changes;
 - it runs `bin/test.sh` in the container.

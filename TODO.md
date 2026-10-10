@@ -48,7 +48,7 @@ Where we are, what is needed from Giovanni, and what comes next. Last updated 20
 
 - [x] `git init`, first commit, push to GitHub.
 - [x] GitHub Actions workflow, `.github/workflows/ci.yml`: builds the image of `docker/Dockerfile`, caches the image layers and `samples/`, runs `fetch-samples.sh` and `test.sh`.
-- [ ] Format workflow and pre-commit hooks as in the StepIt repos: clang-format with the shared `.clang-format`, codespell, the whitespace checks.
+- [x] Format workflow and pre-commit hooks as in the StepIt repos: `.pre-commit-config.yaml` and `.github/workflows/ci-format.yml`, with clang-format, codespell and the whitespace checks.
 - [x] CI badge in the README, and its "Continuous Integration" section rewritten.
 - [ ] Optionally, `CLAUDE.md` as in the StepIt repos.
 
