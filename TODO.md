@@ -47,14 +47,9 @@ Where we are, what is needed from Giovanni, and what comes next. Last updated 20
 ### Repository and CI
 
 - [x] `git init`, first commit, push to GitHub.
-- [ ] GitHub Actions workflow:
-  - build the image from `docker/Dockerfile`;
-  - cache `samples/` by the checksums in `bin/fetch-samples.sh`;
-  - run `fetch-samples.sh` and `test.sh`.
-
-  `~/user-samples` is not there in CI, so only the public samples run.
+- [x] GitHub Actions workflow, `.github/workflows/ci.yml`: builds the image of `docker/Dockerfile`, caches the image layers and `samples/`, runs `fetch-samples.sh` and `test.sh`.
 - [ ] Format workflow and pre-commit hooks as in the StepIt repos: clang-format with the shared `.clang-format`, codespell, the whitespace checks.
-- [ ] CI badges in the README, and its "Continuous Integration" section rewritten.
+- [x] CI badge in the README, and its "Continuous Integration" section rewritten.
 - [ ] Optionally, `CLAUDE.md` as in the StepIt repos.
 
 ### Converter

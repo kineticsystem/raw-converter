@@ -1,5 +1,7 @@
 # DNG converter  <!-- omit in toc -->
 
+[![CI](https://github.com/kineticsystem/dng-converter/actions/workflows/ci.yml/badge.svg)](https://github.com/kineticsystem/dng-converter/actions/workflows/ci.yml)
+
 ## Table of Contents <!-- omit in toc -->
 
 - [Introduction](#introduction)
@@ -223,4 +225,9 @@ dng-converter is under the [MIT licence](LICENSE). The third-party software it u
 
 ## Continuous Integration
 
-Not set up yet. The plan is a GitHub Actions workflow that builds the container's image, downloads the samples (cached by their checksums) and runs `bin/test.sh`. Everything it needs is already in `docker/` and `bin/`.
+The workflow [`ci.yml`](.github/workflows/ci.yml) runs on every push and pull request. It runs in the same container as development:
+- it builds the image of [`docker/Dockerfile`](docker/Dockerfile), with its layers kept in the Actions cache;
+- it downloads the sample raw files, also cached, until `bin/fetch-samples.sh` changes;
+- it runs `bin/test.sh` in the container.
+
+Our own raw files are not there, so CI runs every test but those on `~/user-samples`. When a test fails, its log is kept as an artifact of the run.
