@@ -12,10 +12,13 @@ add_executable(rawconv_tests
   test_cli_options.cpp
   test_converter.cpp
   test_dng_writer.cpp
-  test_samples.cpp)
-# The tests read the DNG files back with LibRaw, and use internal headers.
+  test_samples.cpp
+  test_tiff_output.cpp)
+# The tests read the DNG files back with LibRaw, the ICC profiles with Little
+# CMS, and use internal headers.
 target_include_directories(rawconv_tests PRIVATE ${PROJECT_SOURCE_DIR}/src)
-target_link_libraries(rawconv_tests PRIVATE rawconv::rawconv raw-convert-cli PkgConfig::LIBRAW GTest::gtest_main)
+target_link_libraries(rawconv_tests PRIVATE rawconv::rawconv raw-convert-cli PkgConfig::LIBRAW PkgConfig::LCMS2
+                                            GTest::gtest_main)
 # Built in rather than passed in the environment: gtest_discover_tests lists
 # the tests by running the binary at build time, and a sample folder that is
 # not known then has no tests. The RAWCONV_SAMPLE_DIRS environment variable

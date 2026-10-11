@@ -16,6 +16,7 @@
   - [Options](#options)
   - [Bad Pixels](#bad-pixels)
   - [Opening the DNG Files](#opening-the-dng-files)
+  - [TIFF Files](#tiff-files)
 - [Using the Library](#using-the-library)
   - [Adding It to a CMake Project](#adding-it-to-a-cmake-project)
   - [Converting from Code](#converting-from-code)
@@ -30,6 +31,8 @@
 raw-converter is a C++17 library, and a command line tool, that converts camera raw files to DNG files as Adobe DNG Converter does: the same raw data, described with the same values, so that any raw editor that reads DNG renders them as it renders Adobe's. It was written for the Canon EOS 5D Mark II and the Canon EOS 450D (Digital Rebel XSi, Kiss X2), whose CR2 files it is tested on, and converts the raw files of every camera with a Bayer sensor that [LibRaw](https://www.libraw.org) reads.
 
 On request, it also finds hot, stuck and dead pixels, and repairs them in the raw data, so that every raw editor shows them repaired. This is off by default, because Adobe DNG Converter does not do it: its DNGs keep every bad pixel, and only Adobe's own raw editors hide them, when rendering.
+
+Also on request, it writes TIFF files, instead of the DNG files or besides them: the image demosaiced, white balanced as shot, linear, 16 bits per sample, in Rec. 2020, ProPhoto RGB or sRGB, with nothing else done to it. They are for programs that take an image rather than raw data, e.g. a focus stacker, whose result is graded afterwards.
 
 The tool takes a raw file or a folder of them, and an output folder:
 
@@ -52,6 +55,7 @@ The library does the same from code, so that a bigger application, e.g. one that
   The tests compare the DNG of a 5D Mark III file with the one Adobe DNG Converter made of it. Ten 5D Mark II files were compared with Adobe's DNGs of them in the same way: the same samples, bit for bit, and the same tags that define the image.
 - **Its metadata.** The original EXIF and GPS data, and the Canon maker note, which ExifTool and photo managers still read, plus the lens model and the serial number as EXIF 2.3 fields.
 - **Bad pixels repaired, on request.** With `--bad-pixels`, hot and dead pixels are replaced by the median of their same-colour neighbours, so that the DNG looks right whatever opens it. A faint defect is only repaired once photos of *different* scenes by the same camera body show it, so the details of a scene are left alone.
+- **Linear TIFF files, on request.** With `--format tiff` or `both`, the image demosaiced by LibRaw, with its bad pixels repaired: the camera's white balance and colour matrix, and no exposure, tone curve, sharpening or noise reduction. 16 bits per sample, with the ICC profile of its colour space and the original's EXIF data.
 - **Fast.** Several files converted in parallel: about 2.5 seconds for the seven sample files (154 MB of CR2) on a 12-core computer.
 - **Open source.** MIT licence, with only MIT-compatible dependencies. No Adobe code.
 
@@ -113,7 +117,7 @@ The tool is then `build/apps/raw-convert/raw-convert`, which is on the `PATH` in
 raw-convert [options] <raw file or folder> <output folder>
 ```
 
-Each DNG is named after its raw file, e.g. `IMG_1069.CR2` becomes `IMG_1069.dng`. A DNG that already exists is skipped, unless `--overwrite` is given. For example, in the container:
+Each DNG is named after its raw file, e.g. `IMG_1069.CR2` becomes `IMG_1069.dng`, and each TIFF too, with `.tif`. A file that already exists is not written again, unless `--overwrite` is given, and a raw file whose files all exist is skipped. For example, in the container:
 
 ```bash
 samples
@@ -133,13 +137,15 @@ The tool exits with 0 when every file was converted or skipped, 1 when one faile
 | Option | What it does |
 |---|---|
 | `-r`, `--recursive` | Also convert the raw files in sub-folders, mirroring them in the output folder. |
-| `-j N`, `--jobs N` | Files converted in parallel. Default: one per core, at most 8, as each takes about 150 MB. |
+| `--format FORMAT` | The files written for each raw file. `dng` (default): the DNG. `tiff`: a TIFF, see [TIFF Files](#tiff-files). `both`: the DNG and the TIFF. |
+| `--colour-space SPACE` | The colour space of the TIFF files, all linear. `rec2020` (default): ITU-R BT.2020. `prophoto`: ProPhoto RGB. `srgb`: the sRGB primaries, which clip saturated colours. |
+| `-j N`, `--jobs N` | Files converted in parallel. Default: one per core, at most 8, as each takes about 150 MB, and about 600 MB with a TIFF. |
 | `--bad-pixels MODE` | `off` (default): leave the pixels as they are, as Adobe DNG Converter does. `image`: repair the bad pixels of each file, found in it on its own. `batch`: also learn each camera's defects from all the files, and repair them in all of that camera's files. `auto`: `batch` for 3 files or more, `image` otherwise. |
 | `--repair METHOD` | How `--bad-pixels` repairs them. `interpolate` (default): replace the pixels in the raw data, so that every raw editor shows them repaired. `opcode`: keep the raw data as it is, and list the pixels in a DNG `FixBadPixelsList` opcode, which only raw editors that support DNG opcodes apply. |
 | `--defect-map FILE` | Known defects, repaired in addition to those found. The file is created, or updated with what the run learns, for the next run. Needs `--bad-pixels`. |
 | `--uncompressed` | Do not compress the raw data. The files are about twice as large. |
 | `--no-preview` | Do not keep the camera's JPEG preview. |
-| `--overwrite` | Replace DNG files that exist. |
+| `--overwrite` | Replace the files that exist. |
 | `-q`, `--quiet` | Only print errors. |
 
 ### Bad Pixels
@@ -162,6 +168,23 @@ Any raw editor that reads DNG opens the files. They carry the camera name, colou
 
 One difference with Adobe DNG Converter remains for the 450D: Adobe adds a per-camera **baseline exposure**, and we do not know its value yet. Its photos open a little darker than Adobe's DNGs, typically by 0.25 to 0.5 EV, until its row is added: see [Adding a Camera](#adding-a-camera). The 5D Mark II and the 5D Mark III have their rows, read from Adobe's own DNGs.
 
+### TIFF Files
+
+```bash
+raw-convert --format tiff --bad-pixels image IMG_1069.CR2 out
+```
+
+`out/IMG_1069.tif` is the camera's crop of the image, e.g. 5616 × 3744 pixels for the 5D Mark II, demosaiced with AHD. Its values are linear, the light the sensor measured: twice the light is twice the value. Nothing is added to them: no exposure, no tone curve, no sharpening, no noise reduction. Opened as it is, the image looks dark and flat, as a raw file does before it is edited.
+
+- **White balance:** the camera's, as shot.
+- **Colour:** the camera's colour matrix, to the colour space of `--colour-space`, whose ICC profile the file embeds. Rec. 2020, the default, holds nearly every colour a camera records. In sRGB, saturated colours, e.g. of flowers or lights, are clipped.
+- **Levels:** the sensor's clipping level is 65535, for the colour the white balance amplifies least. A highlight the sensor clipped is 65535 in every colour: white.
+- **Orientation:** the pixels are as the sensor saw them, and the file's Orientation tag says how to turn them upright, as the camera recorded it.
+- **Bad pixels:** repaired with `--bad-pixels`, with `--repair opcode` too.
+- **Metadata:** the original's EXIF and GPS data, with the colour space marked "uncalibrated", as it is in the ICC profile rather than sRGB.
+
+The files are uncompressed, about 6 bytes per pixel: 126 MB for the 5D Mark II.
+
 ## Using the Library
 
 ### Adding It to a CMake Project
@@ -182,7 +205,7 @@ FetchContent_MakeAvailable(rawconv)
 target_link_libraries(my_app PRIVATE rawconv::rawconv)
 ```
 
-As a sub-project, it builds only the library: the tool and the tests are off. Installed with `cmake --install build`, it is found with `find_package(rawconv REQUIRED)`. In all three cases, LibRaw must be installed, e.g. with `apt install libraw-dev` on Ubuntu.
+As a sub-project, it builds only the library: the tool and the tests are off. Installed with `cmake --install build`, it is found with `find_package(rawconv REQUIRED)`. In all three cases, LibRaw and Little CMS must be installed, e.g. with `apt install libraw-dev liblcms2-dev` on Ubuntu.
 
 ### Converting from Code
 
@@ -207,9 +230,18 @@ rawconv::Converter repairing(options);
 rawconv::RawImage image = rawconv::readRawBuffer(data, size, "IMG_0001.CR2");
 repairing.repair(image);
 rawconv::writeDng(image, "out/IMG_0001.dng");
+
+// The same image, demosaiced, as a linear 16-bit TIFF; or rendered in memory.
+rawconv::writeTiff(image, "out/IMG_0001.tif");
+rawconv::RenderedImage rendered = rawconv::renderImage(image, rawconv::ColorSpace::REC2020);
+
+// A folder, to DNG and TIFF.
+options.format = rawconv::OutputFormat::DNG_AND_TIFF;
+rawconv::Converter both(options);
+both.convert(rawconv::planJobs("in", "out"));
 ```
 
-`Converter` takes its options and, optionally, the services it works with: the raw decoder, the bad pixel detector, the DNG encoder and the file store. An application can replace any of them, e.g. to read the files from a camera or to write them elsewhere. `Converter::convert` takes a progress callback, and `Converter::cancel()` stops a batch from any thread. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#dependency-injection-and-tests).
+`Converter` takes its options and, optionally, the services it works with: the raw decoder, the bad pixel detector, the DNG encoder, the file store and the TIFF encoder. An application can replace any of them, e.g. to read the files from a camera or to write them elsewhere. `Converter::convert` takes a progress callback, and `Converter::cancel()` stops a batch from any thread. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#dependency-injection-and-tests).
 
 ## Adding a Camera
 

@@ -148,6 +148,39 @@ TEST_P(Samples, OpcodeRepairKeepsEveryValue)
   EXPECT_EQ(dng.data, original.data);
 }
 
+TEST_P(Samples, RendersTheDefaultCropAsATiff)
+{
+  const auto input = GetParam();
+  const RawImage raw = readRawFile(input);
+  const RenderedImage image = renderImage(raw);
+  // The camera's own size, e.g. 5616 x 3744 for the 5D Mark II.
+  EXPECT_EQ(image.width, raw.default_crop.width);
+  EXPECT_EQ(image.height, raw.default_crop.height);
+  EXPECT_EQ(image.orientation, raw.orientation);
+
+  // Linear, and not blank: a photo's mean is a few percent of the range, and
+  // most of it is neither black nor clipped.
+  double sum = 0;
+  size_t black = 0;
+  size_t clipped = 0;
+  for (uint16_t v : image.data)
+  {
+    sum += v;
+    black += v == 0;
+    clipped += v == 65535;
+  }
+  const double mean = sum / image.data.size();
+  EXPECT_GT(mean, 65535 * 0.01);
+  EXPECT_LT(mean, 65535 * 0.5);
+  EXPECT_LT(black, image.data.size() / 10);
+  EXPECT_LT(clipped, image.data.size() / 10);
+
+  const std::vector<uint8_t> file = encodeTiff(image);
+  auto reader = tiff::TiffReader::open(file.data(), file.size());
+  ASSERT_TRUE(reader);
+  EXPECT_TRUE(reader->find(reader->firstIfdOffset(), 34675));  // The ICC profile.
+}
+
 std::string sampleName(const ::testing::TestParamInfo<std::filesystem::path>& info)
 {
   std::string name = info.param.stem().string();

@@ -38,9 +38,20 @@ std::string usage()
 
 Converts camera raw files (Canon CR2 and the other formats LibRaw reads) to
 DNG files as Adobe DNG Converter does: the raw data as the camera recorded
-it, with the same description. Optionally, repairs hot and dead pixels.
+it, with the same description. Optionally, repairs hot and dead pixels, and
+writes TIFF files: the image demosaiced, linear, 16 bits per sample.
 
 Options:
+  --format FORMAT         The files to write for each raw file:
+                            dng   the DNG (default);
+                            tiff  a TIFF, named as the DNG with .tif;
+                            both  the DNG and the TIFF.
+  --colour-space SPACE    The colour space of the TIFF files, all linear,
+                          with its ICC profile embedded:
+                            rec2020   ITU-R BT.2020 (default);
+                            prophoto  ProPhoto RGB;
+                            srgb      sRGB primaries, which clip saturated
+                                      colours.
   -r, --recursive         Also convert the raw files in sub-folders, mirroring
                           them in the output folder.
   -j, --jobs N            Files converted in parallel (default: one per core).
@@ -68,7 +79,8 @@ Options:
   --uncompressed          Do not compress the raw data (lossless JPEG is the
                           default, as with Adobe DNG Converter).
   --no-preview            Do not keep the camera's JPEG preview.
-  --overwrite             Replace DNG files that exist (default: skip them).
+  --overwrite             Replace output files that exist (default: skip
+                          them).
   -q, --quiet             Only print errors.
   -h, --help              Print this help.
   --version               Print the version.
@@ -145,6 +157,46 @@ CliOptions parseCommandLine(const std::vector<std::string>& args)
       else
       {
         throw std::invalid_argument("--repair expects interpolate or opcode, not '" + method + "'");
+      }
+    }
+    else if (arg == "--format")
+    {
+      const std::string& format = value();
+      if (format == "dng")
+      {
+        options.convert.format = OutputFormat::DNG;
+      }
+      else if (format == "tiff")
+      {
+        options.convert.format = OutputFormat::TIFF;
+      }
+      else if (format == "both")
+      {
+        options.convert.format = OutputFormat::DNG_AND_TIFF;
+      }
+      else
+      {
+        throw std::invalid_argument("--format expects dng, tiff or both, not '" + format + "'");
+      }
+    }
+    else if (arg == "--colour-space")
+    {
+      const std::string& space = value();
+      if (space == "rec2020")
+      {
+        options.convert.tiff.color_space = ColorSpace::REC2020;
+      }
+      else if (space == "prophoto")
+      {
+        options.convert.tiff.color_space = ColorSpace::PROPHOTO;
+      }
+      else if (space == "srgb")
+      {
+        options.convert.tiff.color_space = ColorSpace::SRGB;
+      }
+      else
+      {
+        throw std::invalid_argument("--colour-space expects rec2020, prophoto or srgb, not '" + space + "'");
       }
     }
     else if (arg == "--defect-map")

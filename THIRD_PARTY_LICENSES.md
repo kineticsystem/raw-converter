@@ -8,14 +8,14 @@ These are what an application that uses `librawconv`, or ships `raw-convert`, di
 
 | Software | Used for | Licence | Compatible with MIT because |
 |---|---|---|---|
-| [LibRaw](https://www.libraw.org) 0.21 | Decoding the raw files | LGPL-2.1 **or** CDDL-1.0, at the user's choice | Linked dynamically, as `libraw_r.so`. Under the LGPL, a program that links it dynamically may have any licence, as long as LibRaw itself stays replaceable and its own licence comes with any copy of it that is distributed. Linking it statically is also allowed under the CDDL, which only covers LibRaw's own files. |
-| [Little CMS](https://www.littlecms.com) 2 | Colour management, used by LibRaw | MIT | The same licence. |
+| [LibRaw](https://www.libraw.org) 0.21 | Decoding the raw files, and demosaicing them for the TIFF files | LGPL-2.1 **or** CDDL-1.0, at the user's choice | Linked dynamically, as `libraw_r.so`. Under the LGPL, a program that links it dynamically may have any licence, as long as LibRaw itself stays replaceable and its own licence comes with any copy of it that is distributed. Linking it statically is also allowed under the CDDL, which only covers LibRaw's own files. |
+| [Little CMS](https://www.littlecms.com) 2 | Making the ICC profiles of the TIFF files; colour management, used by LibRaw | MIT | The same licence. |
 | [libjpeg-turbo](https://libjpeg-turbo.org) | Decoding JPEG-compressed raw data, used by LibRaw | IJG and BSD-3-Clause, plus zlib for parts | Permissive. A binary distribution must credit the Independent JPEG Group in its documentation. |
 | libgomp, libstdc++, libgcc | GCC's runtime libraries, used by LibRaw and the code | GPL-3 with the GCC Runtime Library Exception | The exception lets programs of any licence link them. |
 
 The Ubuntu package of LibRaw includes no GPL code. The old GPL "demosaic packs" were removed from LibRaw in version 0.20. Debian's copyright file also lists a CC-BY-SA-3.0 data file, but it belongs to LibRaw's optional [RawSpeed](https://github.com/darktable-org/rawspeed) integration. That integration is not built in (`libraw_r.so` only has its empty hooks), so neither RawSpeed nor that file is part of the library.
 
-The DNG writer, the lossless JPEG encoder, the TIFF reader and writer, and the bad pixel detector are this project's own code, under MIT.
+The DNG and TIFF writers, the lossless JPEG encoder, the TIFF reader and writer, and the bad pixel detector are this project's own code, under MIT.
 
 ## Used only to build and test
 

@@ -243,6 +243,39 @@ inline std::vector<std::filesystem::path> sampleFiles()
   return files;
 }
 
+// A TIFF encoder that records the images and options it is given, by original
+// file name, and returns a tiny placeholder.
+class CapturingTiffEncoder : public TiffEncoder
+{
+public:
+  struct Call
+  {
+    RawImage image;
+    TiffWriteOptions options;
+  };
+
+  std::vector<uint8_t> encode(const RawImage& image, const TiffWriteOptions& options) const override
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    calls_[image.metadata.original_file_name] = { image, options };
+    return { 'T', 'I', 'F' };
+  }
+  const Call& call(const std::string& file) const
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return calls_.at(file);
+  }
+  size_t calls() const
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return calls_.size();
+  }
+
+private:
+  mutable std::mutex mutex_;
+  mutable std::map<std::string, Call> calls_;
+};
+
 // A fresh, empty temporary folder, removed with the object.
 class TempDir
 {

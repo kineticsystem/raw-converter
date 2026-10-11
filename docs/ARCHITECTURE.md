@@ -11,6 +11,7 @@
   - [CameraTable](#cameratable)
   - [BadPixelDetector and DefectMap](#badpixeldetector-and-defectmap)
   - [DngEncoder](#dngencoder)
+  - [TiffEncoder and renderImage](#tiffencoder-and-renderimage)
   - [FileStore](#filestore)
   - [Converter](#converter)
   - [The Command Line Tool](#the-command-line-tool)
@@ -18,6 +19,7 @@
 - [Dependency Injection and Tests](#dependency-injection-and-tests)
 - [The DNG File](#the-dng-file)
 - [Lossless JPEG](#lossless-jpeg)
+- [The TIFF File](#the-tiff-file)
 - [Bad Pixels](#bad-pixels)
 - [Threads](#threads)
 - [Compared with Adobe DNG Converter](#compared-with-adobe-dng-converter)
@@ -38,6 +40,8 @@ It follows one idea: **a DNG is the camera's raw data, plus what a raw editor ne
 - describe them exactly as Adobe DNG Converter would, so that any raw editor renders them as it renders Adobe's DNG.
 
 Repairing bad pixels is the one exception, and it is off by default, because Adobe DNG Converter does not do it. By default, therefore, our DNG holds the same samples as Adobe's, bit for bit, masked border included. When asked, the repaired values replace the bad ones in the active area, so that the file looks right whatever opens it, and every other sample stays as it is.
+
+The TIFF is the other output, on request: the same image, repaired the same way, demosaiced by LibRaw, linear, in a colour space with its ICC profile. It is for programs that take an image rather than raw data, e.g. StepIt Stacker's focus stacking, and it adds nothing to the image that such a program would have to undo: no exposure, no tone curve, no sharpening (see [The TIFF File](#the-tiff-file)).
 
 ## The Big Picture
 
@@ -106,25 +110,30 @@ flowchart TB
     Detect --> Map["DefectMap<br/>per camera body"]
     Map --> Repair["repair<br/>interpolate or opcode"]
     Repair --> Encode["DngEncoder<br/>TIFF writer + lossless JPEG<br/>+ thumbnail"]
+    Repair --> Render["TiffEncoder<br/>renderImage: LibRaw<br/>+ ICC profile"]
     Encode --> Write["FileStore<br/>write, atomically"]
-    Write --> Out["DNG file"]
+    Render --> Write
+    Write --> Out["DNG file, TIFF file or both"]
 
     classDef default fill:#3b6fb6,stroke:#2c5590,color:#ffffff
 ```
 
-`Converter` runs the pipeline, one file per thread. In `BATCH` mode it first decodes every file, to learn each camera's defects, then converts them all: see [Bad Pixels](#bad-pixels). The command line tool, `raw-convert`, only parses its arguments, lists the files and prints the results. Everything else is in the library, `librawconv`, which a bigger application links in the same way.
+`Converter` runs the pipeline, one file per thread, and encodes each image as the format asks: DNG, TIFF or both. In `BATCH` mode it first decodes every file, to learn each camera's defects, then converts them all: see [Bad Pixels](#bad-pixels). The command line tool, `raw-convert`, only parses its arguments, lists the files and prints the results. Everything else is in the library, `librawconv`, which a bigger application links in the same way.
 
 ## The Modules
 
 | Path | Role | Depends on |
 |---|---|---|
 | `include/rawconv/raw_image.hpp` | The data model: `RawImage`, `Metadata`, `PixelPos`, `Rect`. Plain structs, no behaviour beyond accessors. | `camera_table.hpp` |
-| `include/rawconv/raw_reader.hpp`, `src/raw_reader.cpp` | `RawDecoder`, and `LibRawDecoder`, its LibRaw implementation. The only code that includes LibRaw. | LibRaw, `tiff_reader`, `camera_table` |
+| `include/rawconv/raw_reader.hpp`, `src/raw_reader.cpp` | `RawDecoder`, and `LibRawDecoder`, its LibRaw implementation. With `renderer`, the only code that includes LibRaw. | LibRaw, `tiff_reader`, `camera_table` |
+| `include/rawconv/renderer.hpp`, `src/renderer.cpp` | `renderImage`: a `RawImage` demosaiced by LibRaw into a `RenderedImage`, linear RGB. `ColorSpace`. | LibRaw, `dng_writer`, `bad_pixels` |
+| `include/rawconv/tiff_output.hpp`, `src/tiff_output.cpp` | `encodeTiff`: a `RenderedImage` as a 16-bit RGB TIFF. `iccProfile`, made with Little CMS. The `TiffEncoder` interface. | Little CMS, `renderer`, `tiff_writer`, `exif` |
+| `src/exif.*` | The EXIF and GPS directories of a written file, from the original's: shared by the DNG and the TIFF. | `tiff_writer` |
 | `src/tiff/tiff_reader.*` | Reads TIFF directories in place, to copy the original EXIF, GPS and maker note into the DNG. | — |
 | `include/rawconv/camera_table.hpp`, `src/camera_table.cpp` | Per-model values not in the raw file, e.g. the baseline exposure. | — |
 | `include/rawconv/bad_pixels.hpp`, `src/bad_pixels.cpp` | `detectBadPixels`, `repairBadPixels`, the `BadPixelDetector` interface, `DefectMap`, `sceneSignature`. | `raw_image` |
 | `include/rawconv/dng_writer.hpp`, `src/dng_writer.cpp` | `encodeDng`: which DNG tags, in which directory, with which values. The `DngEncoder` interface. | `tiff_writer`, `lj92_encoder`, `thumbnail` |
-| `src/tiff/tiff_writer.*` | A generic TIFF writer: directories, child directories, data blocks, offsets. Knows nothing of DNG. | — |
+| `src/tiff/tiff_writer.*` | A generic TIFF writer: directories, child directories, data blocks, offsets. Knows nothing of DNG. Writes the DNG and the TIFF alike. | — |
 | `src/lj92_encoder.*` | Lossless JPEG (ITU T.81 process 14). Knows nothing of TIFF or DNG. | — |
 | `src/thumbnail.*` | The 256-pixel sRGB rendering in the DNG's first directory. | `raw_image` |
 | `include/rawconv/file_store.hpp`, `src/file_store.cpp` | The `FileStore` interface, and `LocalFileStore`, with its atomic writes. | — |
@@ -132,7 +141,7 @@ flowchart TB
 | `src/parallel.hpp` | `parallelFor`: a loop over threads that rethrows the first exception. | — |
 | `apps/raw-convert/` | The command line tool. `cli_options` (parsing, tested) and `main` (printing, signals). | the library |
 
-The public headers are under `include/rawconv`, and `rawconv.hpp` includes them all. Nothing in them includes LibRaw, so an application that links the library doesn't need LibRaw's headers. Everything under `src` is private.
+The public headers are under `include/rawconv`, and `rawconv.hpp` includes them all. Nothing in them includes LibRaw or Little CMS, so an application that links the library doesn't need their headers. Everything under `src` is private.
 
 ## The Classes
 
@@ -204,6 +213,10 @@ classDiagram
         <<interface>>
         encode(image, options) bytes
     }
+    class TiffEncoder {
+        <<interface>>
+        encode(image, options) bytes
+    }
     class FileStore {
         <<interface>>
         read(path) bytes
@@ -226,11 +239,13 @@ classDiagram
     RawDecoder <|.. LibRawDecoder
     BadPixelDetector <|.. NoiseBadPixelDetector
     DngEncoder <|.. StandardDngEncoder
+    TiffEncoder <|.. StandardTiffEncoder
     FileStore <|.. LocalFileStore
     LibRawDecoder o-- CameraTable : uses
     Converter o-- RawDecoder : injected
     Converter o-- BadPixelDetector : injected
     Converter o-- DngEncoder : injected
+    Converter o-- TiffEncoder : injected
     Converter o-- FileStore : injected
     Converter *-- DefectMap : owns
 ```
@@ -310,22 +325,30 @@ Some of what a raw editor needs to render a photo as it renders Adobe's DNG is n
 - [`lj92_encoder`](../src/lj92_encoder.cpp) compresses a tile;
 - [`thumbnail`](../src/thumbnail.cpp) renders the preview the DNG's first directory must hold.
 
+### TiffEncoder and renderImage
+
+`TiffEncoder::encode` turns a `RawImage` into the bytes of a TIFF; `StandardTiffEncoder` renders it with `renderImage`, then encodes it with `encodeTiff`. The two halves are apart:
+- [`renderer.cpp`](../src/renderer.cpp) turns raw data into pixels, with LibRaw: a `RenderedImage`, linear RGB, 16 bits per sample, the default crop, with its colour space, orientation and metadata;
+- [`tiff_output.cpp`](../src/tiff_output.cpp) turns pixels into a file: the tags, the strips, the ICC profile and the EXIF.
+
+An application can render without writing, e.g. to stack the frames in memory. How the rendering works is in [The TIFF File](#the-tiff-file).
+
 ### FileStore
 
-`FileStore` reads raw files and writes DNGs. [`LocalFileStore`](../src/file_store.cpp) writes each DNG under a temporary name next to the target, then renames it, so that:
+`FileStore` reads raw files and writes DNG and TIFF files. [`LocalFileStore`](../src/file_store.cpp) writes each DNG under a temporary name next to the target, then renames it, so that:
 - a reader, e.g. a photo manager watching a folder, never sees half a file;
-- a crash never leaves a broken DNG in place of a good one.
+- a crash never leaves a broken file in place of a good one.
 
 The tests use an in-memory store. An application can use one that reads from a camera, or writes to a database.
 
 ### Converter
 
-[`Converter`](../src/converter.cpp) runs the pipeline over a list of `ConvertJob`s, each a raw file and the path of its DNG:
+[`Converter`](../src/converter.cpp) runs the pipeline over a list of `ConvertJob`s, each a raw file and the path of its DNG. The TIFF takes the same path with `.tif` (`outputPaths`). `ConvertOptions::format` says which to write: `DNG`, `TIFF` or `DNG_AND_TIFF`. Without `overwrite`, only the files that don't exist are written, and a job whose files all exist is skipped.
 - `convert` does it in parallel, and never throws for a single file: each file's outcome is in its `ConvertResult` (`CONVERTED`, `SKIPPED`, `FAILED` or `CANCELLED`);
 - `convertFile` does one file;
 - `repair` does the bad-pixel step alone, for an application that decodes and encodes by itself, e.g. from a buffer it downloaded from the camera.
 
-It gets its four services in a `ConverterServices` struct. Any service left empty gets the production one. The defect map is its own: what it learns carries over from batch to batch.
+It gets its five services in a `ConverterServices` struct. Any service left empty gets the production one. The defect map is its own: what it learns carries over from batch to batch.
 
 `planJobs` turns an input file or folder into jobs, and mirrors sub-folders when recursive. Two raw files of the same name, `IMG_1.CR2` and `IMG_1.CR3`, get two DNG names, so neither silently overwrites the other.
 
@@ -345,6 +368,8 @@ It gets its four services in a `ConverterServices` struct. Any service left empt
 - the TIFF writer: where do bytes go;
 - the LJ92 encoder: how is a tile compressed;
 - `dng_writer`: which tags describe this image;
+- `renderer`: what are its pixels, demosaiced;
+- `tiff_output`: which tags and profile describe those pixels;
 - `raw_reader`: what does LibRaw say about this file;
 - `bad_pixels`: which pixels are defects;
 - `Converter`: in which order, on which thread, with which outcome.
@@ -361,9 +386,9 @@ The fakes in the tests keep the same contract, which is why tests written agains
 
 **Interface segregation.** The interfaces are as narrow as the converter's use of them: one method each, three for `FileStore`. `RawDecoder` does not expose LibRaw's options, `DngEncoder` does not expose tags.
 
-**Dependency inversion.** `Converter` depends on the four interfaces, not on LibRaw, the file system or the encoder. The concrete classes are chosen in one place, `withDefaults()` in `converter.cpp`, or by the application.
+**Dependency inversion.** `Converter` depends on the five interfaces, not on LibRaw, the file system or the encoder. The concrete classes are chosen in one place, `withDefaults()` in `converter.cpp`, or by the application.
 
-**Where it stops.** The pure parts stay free functions: `detectBadPixels`, `repairBadPixels`, `encodeDng`, `encodeLosslessJpeg`, `sceneSignature`, `planJobs`. They have no side effects and nothing to replace, so a test calls them directly, and wrapping them in classes would only add a layer. They are wrapped in a class only where `Converter` needs a seam: `NoiseBadPixelDetector` and `StandardDngEncoder` are two lines each. `planJobs` reads the file system directly: listing a folder is what it is for, and its tests use a temporary folder.
+**Where it stops.** The pure parts stay free functions: `detectBadPixels`, `repairBadPixels`, `encodeDng`, `renderImage`, `encodeTiff`, `iccProfile`, `encodeLosslessJpeg`, `sceneSignature`, `planJobs`. They have no side effects and nothing to replace, so a test calls them directly, and wrapping them in classes would only add a layer. They are wrapped in a class only where `Converter` needs a seam: `NoiseBadPixelDetector`, `StandardDngEncoder` and `StandardTiffEncoder` are two lines each. `planJobs` reads the file system directly: listing a folder is what it is for, and its tests use a temporary folder.
 
 ## Dependency Injection and Tests
 
@@ -376,10 +401,10 @@ services.decoder = std::make_shared<rawconv::LibRawDecoder>(my_table);  // confi
 rawconv::Converter converter(options, services);                    // the rest: defaults
 ```
 
-With all four services replaced by fakes (`tests/test_support.hpp`), the converter's tests check its logic, e.g. which pixels are repaired in `BATCH` mode, in a 32x32 image, with no LibRaw, no files and no encoding:
+With all five services replaced by fakes (`tests/test_support.hpp`), the converter's tests check its logic, e.g. which pixels are repaired in `BATCH` mode, in a 32x32 image, with no LibRaw, no files and no encoding:
 - `FakeDecoder` makes images whose camera and scene depend on the file;
 - `FakeDetector` returns the candidates each test chooses;
-- `CapturingEncoder` records what would be written;
+- `CapturingEncoder` and `CapturingTiffEncoder` record what would be written;
 - `MemoryFileStore` keeps the files in memory.
 
 The real implementations are tested end to end instead, on real raw files, and checked by readers the code does not control:
@@ -477,6 +502,32 @@ DNG compresses raw data with lossless JPEG (compression 7): about half the size 
 
 The tests encode random 16-bit samples, the worst case, at sizes that cut tiles on both edges, and LibRaw decodes them back bit for bit. Real files lose nothing either: every sample file round-trips exactly.
 
+## The TIFF File
+
+**Rendering.** LibRaw renders files, not images in memory, so `renderImage` gives it the image as a DNG, encoded in memory, uncompressed: the DNG describes the image completely, levels, colour matrix, white balance and crop included, and the same code that writes our DNG files writes it. The bad pixels of an `OPCODE` repair, which LibRaw would not apply, are repaired in the data first. LibRaw then renders it with:
+
+| LibRaw setting | Value | Why |
+|---|---|---|
+| `output_bps` | 16 | Every bit the sensor's 14 hold. |
+| `gamm` | 1, 1 | Linear. |
+| `no_auto_bright` | 1 | No exposure added: the sensor's clipping level is 65535. |
+| `use_camera_wb` | 1 | The white balance as shot. |
+| `use_camera_matrix` | 1 | The DNG's colour matrix. |
+| `output_color` | 8, 4 or 1 | Rec. 2020, ProPhoto RGB or sRGB. |
+| `user_flip` | 0 | The pixels as the sensor saw them. |
+| `user_qual` | 3 | AHD demosaicing. |
+| `highlight` | 0 | Clipped highlights are white. |
+
+LibRaw renders the active area, or nearly: from the 5D Mark II's DNG, whose active area starts one row above LibRaw's, as Adobe's does, it leaves out the first row, 3752 rows of 3753. Where its rendering lies is read from its margins, and the default crop, e.g. 5616 × 3744, is cut from it.
+
+LibRaw's DNG reader misplaces the samples of a DNG at most two tiles (512 pixels) wide (see [Tests](#tests)). No camera makes images that narrow, but a test does: such an image is first widened by repeating its last two columns, which keeps the colour pattern, and the crop leaves them out.
+
+**The file.** One directory: 16 bits per sample, RGB, interleaved, uncompressed, in strips of 32 rows. Then:
+- **the ICC profile** of the colour space, made with Little CMS: the colour space's primaries and white, and a linear tone curve;
+- **the orientation**, as the camera recorded it;
+- **the EXIF** of the original. Its colour space says "uncalibrated": the camera's says sRGB, but sRGB means gamma-encoded sRGB, and the profile says what the values are. The camera's pixel dimensions are left out: TIFF has its own;
+- **the GPS** directory, when it holds a position. Canon writes one with its version alone, which says nothing, and which ExifTool's validator calls incomplete in a TIFF.
+
 ## Bad Pixels
 
 A hot pixel is brighter than the light falling on it; a dead one stays dark; a stuck one is always at the white level. All three are a single pixel that does not match its surroundings. A detail of the scene, however small, does: the lens and the anti-aliasing filter of these cameras spread every point of light over several pixels.
@@ -507,7 +558,7 @@ Adobe DNG Converter does neither: its DNGs of the 5D Mark II files are the CR2's
 
 ## Threads
 
-`Converter` converts one file per thread, up to one thread per core and at most 8 by default. Each file in flight takes about 150 MB: the file, LibRaw's buffers, the image, the sensor frame and the encoded DNG. When there are fewer files than threads, the threads left over compress the tiles of each file.
+`Converter` converts one file per thread, up to one thread per core and at most 8 by default. Each file in flight takes about 150 MB: the file, LibRaw's buffers, the image, the sensor frame and the encoded DNG. With a TIFF, it takes about 600 MB: LibRaw's buffers to demosaic, four 16-bit channels for the whole frame, and the rendered image, about 5 GB for 8 files of the 5D Mark II. When there are fewer files than threads, the threads left over compress the tiles of each file.
 
 [`parallelFor`](../src/parallel.hpp) is the only place that starts threads:
 - An exception thrown on a thread is caught, the other threads finish, and the first exception is rethrown to the caller. An exception that escaped a thread would end the whole program, i.e. the application that links the library.
@@ -568,7 +619,7 @@ Ten of Giovanni's own 5D Mark II files, `capt0526.cr2` to `capt0535.cr2`, were c
 ## The Container
 
 The container is defined in [`docker/docker-compose.yml`](../docker/docker-compose.yml) and driven by [`dock.sh`](../docker/dock.sh), as in the StepIt modules, with the scripts in `bin` on its `PATH`. What is specific to the converter:
-- The image is plain Ubuntu 24.04, with CMake, Ninja, `libraw-dev`, GoogleTest, ExifTool and clang-format: nothing to install on the host.
+- The image is plain Ubuntu 24.04, with CMake, Ninja, `libraw-dev`, `liblcms2-dev`, GoogleTest, ExifTool and clang-format: nothing to install on the host.
 - When the rig's package cache (`stepit-apt-cache`, on port 3142) is running, the image downloads its packages through it.
 - `DNG_USER_SAMPLES`, in `docker/.env`, mounts a folder of our own raw files read only at `~/user-samples`. The tests then convert them too.
 
@@ -578,11 +629,12 @@ The container is defined in [`docker/docker-compose.yml`](../docker/docker-compo
 |---|---|
 | `test_dng_writer` | Random 16-bit samples, CFA and linear, compressed and not, at sizes that cut tiles, read back bit for bit by LibRaw. A sensor frame with an active area from an odd row: every sample of the frame, `ActiveArea`, and the opcode's pixels and phase counted from the frame. The tags raw editors need, their types and values. The opcode list, byte by byte. EXIF copy and lens fields. Rejecting inconsistent images. Atomic replacement. |
 | `test_bad_pixels` | No false defects in clean noise. Hot, stuck and dead pixels found. Faint warm pixels are suspects. Stars and highlights left alone. Repair from same-colour neighbours only. Confirmation by different scenes, not by a repeated one. Scene signatures don't depend on exposure. The defect map's text format, CRLF included. |
-| `test_converter` | With fakes: nothing repaired by default, per-image and batch repair, opcode against interpolation, skipping existing files, one bad file not stopping a batch, cancellation, a progress callback that throws, 40 files on 8 threads in order, defects outside the image. `planJobs`: extensions, recursion, duplicate names. |
-| `test_cli_options` | Every option, the help, the errors, the automatic bad-pixel mode. |
-| `test_samples` | Every raw file of `samples` and `~/user-samples`: with the default settings, the whole frame identical to the original's, bit for bit. With repair, converted, read back by LibRaw, compared with the original's samples (only the repaired pixels may differ), black level, CFA, white balance, the unique camera model, and the original's own orientation. |
+| `test_converter` | With fakes: nothing repaired by default, per-image and batch repair, opcode against interpolation, skipping existing files, one bad file not stopping a batch, cancellation, a progress callback that throws, 40 files on 8 threads in order, defects outside the image. The TIFF alone, the DNG and the TIFF from the same repaired image, writing only the missing files. `planJobs` and `outputPaths`: extensions, recursion, duplicate names. |
+| `test_tiff_output` | The ICC profiles read by Little CMS: white is D50 white, linear, our linear sRGB the same colour as Little CMS's sRGB, Rec. 2020 wider than sRGB. The TIFF read back: its tags, its profile, its samples across strips, the EXIF colour space, the GPS directory kept only with a position. The rendering: a grey scene grey and as bright as expected, the default crop, the orientation, the opcode's pixels repaired, a linear raw image. |
+| `test_cli_options` | Every option, the format and colour space included, the help, the errors, the automatic bad-pixel mode. |
+| `test_samples` | Every raw file of `samples` and `~/user-samples`: with the default settings, the whole frame identical to the original's, bit for bit. With repair, converted, read back by LibRaw, compared with the original's samples (only the repaired pixels may differ), black level, CFA, white balance, the unique camera model, and the original's own orientation. Rendered: the default crop's size, the orientation, values neither blank nor clipped, and a TIFF with its profile. |
 | `test_adobe_reference` | Our DNG of the 5D Mark III sample against Adobe's: the whole frame, sample by sample, its size and `ActiveArea`, crop, matrix, white balance, camera traits. |
-| `raw_convert_exiftool_validate` | The command line tool on all samples, every DNG checked by `exiftool -validate`. |
+| `raw_convert_exiftool_validate` | The command line tool on all samples, to DNG and TIFF, every file checked by `exiftool -validate`. |
 
 LibRaw's DNG reader misplaces the samples of images narrower than one tile, or exactly two tiles (512 pixels) wide: [`dng.cpp:100` and `:111`](https://github.com/LibRaw/LibRaw/blob/0.21.2/src/decoders/dng.cpp#L96-L113) assume the tiles of a wider image. No camera makes such images, and the files are valid, so the round-trip tests use other sizes.
 
@@ -596,7 +648,7 @@ LibRaw's DNG reader misplaces the samples of images narrower than one tile, or e
 
 **Another raw decoder**, e.g. for a format LibRaw lacks, is another `RawDecoder`. It must fill in a `RawImage`, and the tests in `test_samples` then apply to it as they are.
 
-**Another output**, e.g. a TIFF rendering, is another `DngEncoder`.
+**Another output format**, e.g. a compressed TIFF or a JPEG, is another encoder like `TiffEncoder`, and a value of `OutputFormat`. Another look of the TIFF, e.g. another demosaicing, is a change in `renderImage` alone.
 
 **A better detector** is another `BadPixelDetector`. `DefectMap` and the repair don't change, as long as it reports confident and suspect pixels.
 
@@ -612,6 +664,16 @@ LibRaw's DNG reader misplaces the samples of images narrower than one tile, or e
 
 **No repair by default; in the raw data when asked.** By default, the DNG holds what the camera recorded, as Adobe's does, so that the two tools make the same file and nothing is lost. Adobe DNG Converter leaves the bad pixels in, because Adobe's own raw editors hide them; other raw editors show them. When asked, the repair goes into the raw data, because many raw editors ignore DNG opcodes, or apply only some of them. The price: a pixel taken for a defect by mistake, e.g. a distant red LED, a single-pixel light source of one saturated colour, loses its original value. `--repair opcode` keeps it, for a raw editor that applies the opcode.
 
+**LibRaw to render the TIFF, from a DNG in memory.** LibRaw already demosaics, white balances and converts the colours of every camera it reads. Rendering from our own DNG, rather than from the raw file again, renders what the DNG holds: the repaired pixels, Adobe's active area and crop. The price is encoding the DNG once more, uncompressed, which is a copy of the frame, and the memory of LibRaw's buffers.
+
+**Linear, with nothing else.** The TIFF is a step in another program's pipeline, e.g. a focus stack graded once merged. Exposure, a tone curve or sharpening would have to be undone, or would harm the next step: sharpening boosts the noise of out-of-focus areas, which a focus stack takes for detail. The image looks dark until graded.
+
+**The orientation as a tag, not turned pixels.** Every file of a session keeps the sensor's layout, whatever the camera's tilt sensor said, so frames shot pointing down align. Programs that show the file turn it upright from the tag.
+
+**Uncompressed.** Every TIFF reader reads it, and it is written as fast as it is copied. Deflate would make it smaller, at the price of time and of a dependency on zlib.
+
+**Little CMS for the ICC profiles.** A profile is a few hundred bytes of matrix and curves, but its rules, e.g. adapting the primaries to D50, are easy to get subtly wrong. Little CMS is what most programs read profiles with, MIT-licensed, and already a dependency of LibRaw.
+
 **Defects confirmed by different scenes.** Counting the shots of a camera would let a tripod sequence confirm its own detail. Counting scenes doesn't, at the cost of needing photos of more than one scene before a faint defect is repaired.
 
 **Verified values only, in the camera table.** A row without a source would make the converter look right while being wrong by a few tenths of a stop. Leaving a camera out is visible, and fixable with one Adobe DNG.
@@ -624,4 +686,6 @@ LibRaw's DNG reader misplaces the samples of images narrower than one tile, or e
 - **No `NewRawImageDigest`.** A DNG validator, e.g. Adobe's, reports these files as having no digest to validate, rather than as damaged.
 - **No embedded original raw file** (Adobe's "Embed Original Raw File" option).
 - **Fujifilm X-Trans and other non-Bayer sensors** are refused with an error.
+- **TIFF highlights and saturated colours clip.** LibRaw clips at the sensor's level, for the colour the white balance amplifies least, and clips the colours outside the colour space: Rec. 2020 holds nearly all of them, sRGB much fewer.
+- **One demosaicing, AHD,** for the TIFF.
 - **POSIX only, for now**: `getpid` and `localtime_r`. Windows needs their equivalents.

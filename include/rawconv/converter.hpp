@@ -15,6 +15,7 @@
 #include "rawconv/dng_writer.hpp"
 #include "rawconv/file_store.hpp"
 #include "rawconv/raw_reader.hpp"
+#include "rawconv/tiff_output.hpp"
 
 namespace rawconv
 {
@@ -41,8 +42,20 @@ enum class BadPixelRepair
   OPCODE,
 };
 
+// The files written for each raw file.
+enum class OutputFormat
+{
+  // The DNG: the raw data, as Adobe DNG Converter writes it.
+  DNG,
+  // A TIFF: the image demosaiced, linear, 16 bits per sample.
+  TIFF,
+  DNG_AND_TIFF,
+};
+
 struct ConvertOptions
 {
+  OutputFormat format = OutputFormat::DNG;
+
   // OFF by default, as Adobe DNG Converter: the raw data is written as the
   // camera recorded it.
   BadPixelMode bad_pixels = BadPixelMode::OFF;
@@ -58,21 +71,26 @@ struct ConvertOptions
   double batch_min_fraction = 0.25;
 
   DngWriteOptions dng;
-  // Replace DNG files that already exist; otherwise they are skipped.
+  TiffWriteOptions tiff;
+  // Replace output files that already exist; otherwise they are not written
+  // again, and a raw file whose outputs all exist is skipped.
   bool overwrite = false;
   // Files converted in parallel; 0 for one per CPU core, up to 8, as each
-  // takes some 150 MB of memory.
+  // takes some 150 MB of memory, and some 600 MB with a TIFF.
   unsigned threads = 0;
 };
 
 struct ConvertResult
 {
   std::filesystem::path input;
+  // The job's output: the DNG, or, when only a TIFF is written, the TIFF.
   std::filesystem::path output;
+  // Every file written, or, when skipped, every file that exists already.
+  std::vector<std::filesystem::path> outputs;
   enum class Status
   {
     CONVERTED,
-    SKIPPED,  // The output exists and overwrite is off.
+    SKIPPED,  // The outputs exist and overwrite is off.
     FAILED,
     CANCELLED,  // cancel() was called before the file was started.
   } status = Status::FAILED;
@@ -80,29 +98,36 @@ struct ConvertResult
   size_t bad_pixels_fixed = 0;  // Repaired, or listed in the opcode.
 };
 
-// One input file and where its DNG goes.
+// One input file and where its DNG goes. A TIFF goes to the same path with
+// the extension .tif: see outputPaths().
 struct ConvertJob
 {
   std::filesystem::path input;
   std::filesystem::path output;
 };
 
+// The files a job writes in the given format: job.output for the DNG, and
+// job.output with the extension .tif for the TIFF, in that order.
+std::vector<std::filesystem::path> outputPaths(const ConvertJob& job, OutputFormat format);
+
 // What the converter works with. Every member left empty gets the production
-// implementation: LibRaw, the noise based detector, the DNG 1.4 encoder and
-// the local file system. Tests replace them with fakes; an application can
-// replace the file store to read from a camera or write elsewhere.
+// implementation: LibRaw, the noise based detector, the DNG 1.4 encoder, the
+// local file system and the TIFF encoder, which renders with LibRaw. Tests
+// replace them with fakes; an application can replace the file store to read
+// from a camera or write elsewhere.
 struct ConverterServices
 {
   std::shared_ptr<const RawDecoder> decoder;
   std::shared_ptr<const BadPixelDetector> detector;
   std::shared_ptr<const DngEncoder> encoder;
   std::shared_ptr<FileStore> files;
+  std::shared_ptr<const TiffEncoder> tiff_encoder;
 };
 
-// Converts raw files to DNG: read, decode, find and repair bad pixels, encode,
-// write. One Converter can be used for many batches: in BATCH mode, what it
-// learns of each camera's defects carries over to the next batch, and can be
-// loaded from and saved to a file through defectMap().
+// Converts raw files to DNG, TIFF or both: read, decode, find and repair bad
+// pixels, encode, write. One Converter can be used for many batches: in BATCH
+// mode, what it learns of each camera's defects carries over to the next
+// batch, and can be loaded from and saved to a file through defectMap().
 class Converter
 {
 public:

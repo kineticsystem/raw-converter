@@ -35,8 +35,9 @@ RUN usermod -aG sudo developer                          # Add user to sudoers.
 # The C++ toolchain and the build system.
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential cmake ninja-build pkg-config git
 
-# LibRaw decodes the camera RAW files (CR2 and every other format it knows).
-RUN apt-get update && apt-get install -y --no-install-recommends libraw-dev
+# LibRaw decodes and renders the camera RAW files (CR2 and every other format
+# it knows); Little CMS makes the ICC profiles of the TIFF files.
+RUN apt-get update && apt-get install -y --no-install-recommends libraw-dev liblcms2-dev
 
 # Testing: GoogleTest for the unit tests; curl to download the sample RAW
 # files; exiftool to inspect and validate the DNG files by hand and in the
