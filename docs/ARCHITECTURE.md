@@ -35,13 +35,12 @@
 
 This document explains how raw-converter is built, what each part is responsible for, and where to start when we want to change something. It assumes we have read the [README](../README.md) and converted a file once.
 
-It follows one idea: **a DNG is the camera's raw data, plus what a raw editor needs to know to render it**. Everything the converter does serves one of those two halves:
-- carry the sensor values across bit for bit;
-- describe them exactly as Adobe DNG Converter would, so that any raw editor renders them as it renders Adobe's DNG.
+The converter reads a raw file into one model, `RawImage`, repairs its bad pixels if asked, and writes it as one of two files, or both:
 
-Repairing bad pixels is the one exception, and it is off by default, because Adobe DNG Converter does not do it. By default, therefore, our DNG holds the same samples as Adobe's, bit for bit, masked border included. When asked, the repaired values replace the bad ones in the active area, so that the file looks right whatever opens it, and every other sample stays as it is.
+- **The DNG is the camera's raw data, plus what a raw editor needs to know to render it.** Everything its writer does serves one of those two halves: carry the sensor values across bit for bit, and describe them exactly as Adobe DNG Converter would, so that any raw editor renders them as it renders Adobe's DNG (see [The DNG File](#the-dng-file)).
+- **The TIFF is the image, rendered and nothing more**, for programs that take pixels rather than raw data, e.g. StepIt Stacker's focus stacking. LibRaw demosaics it, white balances it as shot and converts it to a colour space whose ICC profile the file carries. It adds nothing that such a program would have to undo: no exposure, no tone curve, no sharpening (see [The TIFF File](#the-tiff-file)).
 
-The TIFF is the other output, on request: the same image, repaired the same way, demosaiced by LibRaw, linear, in a colour space with its ICC profile. It is for programs that take an image rather than raw data, e.g. StepIt Stacker's focus stacking, and it adds nothing to the image that such a program would have to undo: no exposure, no tone curve, no sharpening (see [The TIFF File](#the-tiff-file)).
+Both come from the same `RawImage`, so they show the same pixels, repaired the same way. Repairing bad pixels is off by default, because Adobe DNG Converter does not do it: by default, our DNG holds the same samples as Adobe's, bit for bit, masked border included. When asked, the repaired values replace the bad ones in the active area, and every other sample stays as it is.
 
 ## The Big Picture
 
