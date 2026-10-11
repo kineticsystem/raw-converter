@@ -26,7 +26,7 @@ struct DngWriteOptions
   Compression compression = Compression::LOSSLESS_JPEG;
 
   // Keep the camera's own JPEG as the DNG preview, which file browsers and
-  // Lightroom's "Embedded & Sidecar" import show before rendering the raw.
+  // photo managers show before rendering the raw.
   bool embed_preview = true;
 
   // The DNG Software tag.
@@ -37,8 +37,8 @@ struct DngWriteOptions
   unsigned threads = 1;
 };
 
-// Encodes the image as a DNG 1.4 file that Adobe Lightroom and Camera Raw open
-// as they open the output of Adobe DNG Converter.
+// Encodes the image as a DNG 1.4 file, described as Adobe DNG Converter
+// describes the same raw file, which any DNG reader opens.
 std::vector<uint8_t> encodeDng(const RawImage& image, const DngWriteOptions& options = {});
 
 // Turns a RawImage into the bytes of a file: the seam between the converter

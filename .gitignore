@@ -13,3 +13,6 @@ samples/*
 
 # The local settings of the development container, e.g. DNG_USER_SAMPLES.
 docker/.env
+
+# Private raw files and Adobe DNGs of them, compared by hand: not published.
+tmp

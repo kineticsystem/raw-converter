@@ -71,6 +71,9 @@ struct Metadata
   std::string description;
   std::string date_time;  // EXIF format, "YYYY:MM:DD HH:MM:SS"; empty if unknown.
   std::string original_file_name;
+  // The original file's own TIFF Orientation, 1 to 8, as the camera wrote it;
+  // 0 when it has none.
+  uint16_t orientation = 0;
 
   float iso = 0;
   float exposure_time = 0;  // Seconds.
@@ -141,6 +144,16 @@ struct RawImage
   // Bad pixels the raw converter should repair when rendering, written as a
   // DNG FixBadPixelsList opcode: the values in `data` stay as they are.
   std::vector<PixelPos> opcode_bad_pixels;
+
+  // The whole frame of the sensor, masked border included, which the DNG
+  // stores as Adobe DNG Converter does, with `active_area` marking where
+  // `data` lies in it. The samples under the active area are not written:
+  // those of `data` are, repaired or not. Empty when only `data` is stored,
+  // e.g. for a LINEAR_RAW image.
+  std::vector<uint16_t> sensor;
+  uint32_t sensor_width = 0;
+  uint32_t sensor_height = 0;
+  Rect active_area;
 
   // The camera's own JPEG preview, kept as the DNG preview. Empty if none.
   std::vector<uint8_t> preview_jpeg;

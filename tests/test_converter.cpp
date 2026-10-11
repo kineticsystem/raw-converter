@@ -155,6 +155,7 @@ TEST_F(Fixture, ThrowingProgressCallbackDoesNotStopTheBatch)
 TEST_F(Fixture, OpcodeRepairKeepsTheData)
 {
   ConvertOptions options;
+  options.bad_pixels = BadPixelMode::PER_IMAGE;
   options.repair = BadPixelRepair::OPCODE;
   auto jobs = shots(1);
   detector->by_file["A0.CR2"] = { { { 5, 5 } }, {} };
@@ -165,19 +166,24 @@ TEST_F(Fixture, OpcodeRepairKeepsTheData)
   EXPECT_EQ(call.image.at(5, 5), FakeDecoder().decode(reinterpret_cast<const uint8_t*>("A"), 1, "x").at(5, 5));
 }
 
-TEST_F(Fixture, OffRepairsNothing)
+TEST_F(Fixture, RepairsNothingByDefault)
 {
+  // As Adobe DNG Converter: the data as the camera recorded it.
   ConvertOptions options;
-  options.bad_pixels = BadPixelMode::OFF;
+  EXPECT_EQ(options.bad_pixels, BadPixelMode::OFF);
   auto jobs = shots(1);
   detector->by_file["A0.CR2"] = { { { 5, 5 } }, {} };
   EXPECT_EQ(make(options).convert(jobs)[0].bad_pixels_fixed, 0u);
+  const auto& call = encoder->call("A0.CR2");
+  EXPECT_TRUE(call.image.opcode_bad_pixels.empty());
+  EXPECT_EQ(call.image.data, FakeDecoder().decode(reinterpret_cast<const uint8_t*>("A"), 1, "x").data);
 }
 
 TEST_F(Fixture, DefectsOutsideTheImageAreIgnored)
 {
   // A defect map made for another camera mode, or edited by hand.
   ConvertOptions options;
+  options.bad_pixels = BadPixelMode::PER_IMAGE;
   auto jobs = shots(1);
   detector->by_file["A0.CR2"] = { { { 5, 5 }, { 32, 0 }, { 0, 99 } }, {} };
   EXPECT_EQ(make(options).convert(jobs)[0].bad_pixels_fixed, 1u);

@@ -15,7 +15,7 @@
 - [Converting Files](#converting-files)
   - [Options](#options)
   - [Bad Pixels](#bad-pixels)
-  - [In Lightroom](#in-lightroom)
+  - [Opening the DNG Files](#opening-the-dng-files)
 - [Using the Library](#using-the-library)
   - [Adding It to a CMake Project](#adding-it-to-a-cmake-project)
   - [Converting from Code](#converting-from-code)
@@ -27,9 +27,9 @@
 
 ## Introduction
 
-dng-converter is a C++17 library, and a command line tool, that converts camera raw files to DNG files that Adobe Lightroom opens and edits as it does those of Adobe DNG Converter. It was written for the Canon EOS 5D Mark II and the Canon EOS 450D (Digital Rebel XSi, Kiss X2), whose CR2 files it is tested on, and converts the raw files of every camera with a Bayer sensor that [LibRaw](https://www.libraw.org) reads.
+dng-converter is a C++17 library, and a command line tool, that converts camera raw files to DNG files as Adobe DNG Converter does: the same raw data, described with the same values, so that any raw converter that reads DNG renders them as it renders Adobe's. It was written for the Canon EOS 5D Mark II and the Canon EOS 450D (Digital Rebel XSi, Kiss X2), whose CR2 files it is tested on, and converts the raw files of every camera with a Bayer sensor that [LibRaw](https://www.libraw.org) reads.
 
-It also finds hot, stuck and dead pixels, as Adobe's software does, and either tells Lightroom to repair them or repairs them itself.
+On request, it also finds hot, stuck and dead pixels, and repairs them in the raw data, so that every raw converter shows them repaired. This is off by default, because Adobe DNG Converter does not do it: its DNGs keep every bad pixel, and only Adobe's own raw converters hide them, when rendering.
 
 The tool takes a raw file or a folder of them, and an output folder:
 
@@ -41,16 +41,17 @@ The library does the same from code, so that a bigger application, e.g. one that
 
 ## Features
 
-- **The raw data, untouched.** Every sample is carried across bit for bit, compressed with lossless JPEG as Adobe DNG Converter does. The tests read each DNG back with LibRaw and compare it with the original file.
-- **Rendered as Adobe renders it.** The DNG says what Lightroom needs, with Adobe's values:
-  - the camera's name as Adobe knows it, by which Lightroom finds its Adobe Standard and Camera Matching profiles;
+- **The raw data, untouched.** The whole frame of the sensor, masked border included, is carried across bit for bit, and compressed with lossless JPEG, as Adobe DNG Converter does. The tests read each DNG back with LibRaw and compare it with the original file, sample by sample.
+- **Described as Adobe describes it.** The DNG says what a raw converter needs, with Adobe's values:
+  - the camera's name as Adobe knows it, by which raw converters find their profiles for the camera;
   - Adobe's colour matrix and the as-shot white balance;
-  - the black and white levels, and the camera's own crop;
+  - the active area of the sensor, the camera's own crop and its orientation;
+  - the black and white levels;
   - the baseline exposure, noise and sharpness.
 
-  The tests compare the DNG of a 5D Mark III file with the one Adobe DNG Converter made of it.
-- **Its metadata.** The original EXIF and GPS data, and the Canon maker note, which ExifTool and Lightroom still read, plus the lens model and the serial number as EXIF 2.3 fields.
-- **Bad pixels found, by default never overwritten.** Hot and dead pixels are written as a DNG opcode, which Lightroom applies when it renders the photo, while the original values stay in the file. A faint defect is only repaired once photos of *different* scenes by the same camera body show it, so the details of a scene are left alone.
+  The tests compare the DNG of a 5D Mark III file with the one Adobe DNG Converter made of it. Ten 5D Mark II files were compared with Adobe's DNGs of them in the same way: the same samples, bit for bit, and the same tags that define the image.
+- **Its metadata.** The original EXIF and GPS data, and the Canon maker note, which ExifTool and photo managers still read, plus the lens model and the serial number as EXIF 2.3 fields.
+- **Bad pixels repaired, on request.** With `--bad-pixels`, hot and dead pixels are replaced by the median of their same-colour neighbours, so that the DNG looks right whatever opens it. A faint defect is only repaired once photos of *different* scenes by the same camera body show it, so the details of a scene are left alone.
 - **Fast.** Several files converted in parallel: about 2.5 seconds for the seven sample files (154 MB of CR2) on a 12-core computer.
 - **Open source.** MIT licence, with only MIT-compatible dependencies. No Adobe code.
 
@@ -120,7 +121,7 @@ dng-convert samples /tmp/dng
 ```
 
 ```
-[1/7] samples/Canon_EOS_450D.CR2 -> /tmp/dng/Canon_EOS_450D.dng (2 bad pixels)
+[1/7] samples/Canon_EOS_450D.CR2 -> /tmp/dng/Canon_EOS_450D.dng
 ...
 7 converted, 0 skipped, 0 failed
 ```
@@ -133,15 +134,17 @@ The tool exits with 0 when every file was converted or skipped, 1 when one faile
 |---|---|
 | `-r`, `--recursive` | Also convert the raw files in sub-folders, mirroring them in the output folder. |
 | `-j N`, `--jobs N` | Files converted in parallel. Default: one per core, at most 8, as each takes about 150 MB. |
-| `--bad-pixels MODE` | `image`: find bad pixels in each file on its own. `batch`: also learn each camera's defects from all the files, and repair them in all of that camera's files. `off`: leave the pixels as they are. Default: `batch` for 3 files or more, `image` otherwise. |
-| `--repair METHOD` | `opcode` (default): keep the raw data, and tell the raw converter to repair the pixels. `interpolate`: replace them in the raw data, for raw converters that ignore DNG opcodes. |
-| `--defect-map FILE` | Known defects, repaired in addition to those found. The file is created, or updated with what the run learns, for the next run. |
+| `--bad-pixels MODE` | `off` (default): leave the pixels as they are, as Adobe DNG Converter does. `image`: repair the bad pixels of each file, found in it on its own. `batch`: also learn each camera's defects from all the files, and repair them in all of that camera's files. `auto`: `batch` for 3 files or more, `image` otherwise. |
+| `--repair METHOD` | How `--bad-pixels` repairs them. `interpolate` (default): replace the pixels in the raw data, so that every raw converter shows them repaired. `opcode`: keep the raw data as it is, and list the pixels in a DNG `FixBadPixelsList` opcode, which only raw converters that support DNG opcodes apply. |
+| `--defect-map FILE` | Known defects, repaired in addition to those found. The file is created, or updated with what the run learns, for the next run. Needs `--bad-pixels`. |
 | `--uncompressed` | Do not compress the raw data. The files are about twice as large. |
 | `--no-preview` | Do not keep the camera's JPEG preview. |
 | `--overwrite` | Replace DNG files that exist. |
 | `-q`, `--quiet` | Only print errors. |
 
 ### Bad Pixels
+
+By default, the bad pixels stay as the camera recorded them, as in Adobe's DNGs. `--bad-pixels` repairs them in the active area of the raw data, and leaves every other sample as it is.
 
 A hot pixel is a single pixel brighter than the light falling on it; a dead one stays dark. The converter compares each pixel with its nearest pixels of the same colour, in units of the photo's own noise, so the same settings work at every ISO. Detail of the scene, even a star, spreads over several pixels through the lens, and is left alone.
 
@@ -150,14 +153,14 @@ A pixel far out of line is repaired in any case. One only somewhat out of line c
 To keep what is learnt from one folder for the next, give a defect map, e.g. one per camera body:
 
 ```bash
-dng-convert --defect-map ~/5d-mark-ii-defects.txt ~/Pictures/2009-09-02 ~/Pictures/dng
+dng-convert --bad-pixels batch --defect-map ~/5d-mark-ii-defects.txt ~/Pictures/2009-09-02 ~/Pictures/dng
 ```
 
-### In Lightroom
+### Opening the DNG Files
 
-Import the DNG files as usual. Lightroom recognises the camera, and offers the Adobe Standard and Camera Matching profiles as it does for the CR2 files. It applies the bad-pixel opcode when it renders the photos.
+Any raw converter that reads DNG opens the files. They carry the camera name, colour matrix, white balance, crop, orientation and baseline values of Adobe's DNG of the same raw file, so a raw converter that has a profile for the camera finds it, and renders the photo as it renders Adobe's DNG. By default, the raw data is the same as in Adobe's DNG, sample for sample, bad pixels included: Adobe's raw converters hide hot pixels when rendering, and other raw converters may show them. Converted with `--bad-pixels`, the files have them repaired whatever opens them.
 
-One difference with Adobe DNG Converter remains for the 5D Mark II and the 450D: Adobe adds a per-camera **baseline exposure**, and we do not know their values yet. Their photos may open a little darker than Adobe's DNGs, typically by 0.25 to 0.5 EV, until their row is added: see [Adding a Camera](#adding-a-camera). The 5D Mark III has its row, verified against Adobe's own DNG.
+One difference with Adobe DNG Converter remains for the 450D: Adobe adds a per-camera **baseline exposure**, and we do not know its value yet. Its photos open a little darker than Adobe's DNGs, typically by 0.25 to 0.5 EV, until its row is added: see [Adding a Camera](#adding-a-camera). The 5D Mark II and the 5D Mark III have their rows, read from Adobe's own DNGs.
 
 ## Using the Library
 
@@ -186,7 +189,7 @@ As a sub-project, it builds only the library: the tool and the tests are off. In
 ```cpp
 #include <dngconv/dngconv.hpp>
 
-// A folder, as the tool does.
+// A folder, as the tool does: the raw data as the camera recorded it.
 dngconv::Converter converter;
 for (const auto& result : converter.convert(dngconv::planJobs("in", "out")))
 {
@@ -196,9 +199,13 @@ for (const auto& result : converter.convert(dngconv::planJobs("in", "out")))
   }
 }
 
-// A file already in memory, e.g. just downloaded from the camera.
+// A file already in memory, e.g. just downloaded from the camera, with its
+// bad pixels repaired.
+dngconv::ConvertOptions options;
+options.bad_pixels = dngconv::BadPixelMode::PER_IMAGE;
+dngconv::Converter repairing(options);
 dngconv::RawImage image = dngconv::readRawBuffer(data, size, "IMG_0001.CR2");
-converter.repair(image);
+repairing.repair(image);
 dngconv::writeDng(image, "out/IMG_0001.dng");
 ```
 
@@ -206,10 +213,10 @@ dngconv::writeDng(image, "out/IMG_0001.dng");
 
 ## Adding a Camera
 
-Any camera that LibRaw reads converts as it is. For its photos to open in Lightroom exactly as bright as Adobe's DNGs do, the converter needs the values Adobe DNG Converter takes from its own table of cameras. Convert one raw file of the camera with Adobe DNG Converter, then read them:
+Any camera that LibRaw reads converts as it is. For its DNGs to be the same as Adobe's, the converter needs the values Adobe DNG Converter takes from its own table of cameras: without them, the photos open darker, and the active area may differ from Adobe's by a row or a column. Convert one raw file of the camera with Adobe DNG Converter, then read them:
 
 ```bash
-exiftool -n -UniqueCameraModel -BaselineExposure -BaselineNoise -BaselineSharpness -BayerGreenSplit IMG_0001.dng
+exiftool -n -UniqueCameraModel -BaselineExposure -BaselineNoise -BaselineSharpness -BayerGreenSplit -SubIFD:ActiveArea IMG_0001.dng
 ```
 
 Then add a row to [`src/camera_table.cpp`](src/camera_table.cpp), with where the values come from. An application can also add rows at run time, to a `CameraTable` it gives to `LibRawDecoder`.

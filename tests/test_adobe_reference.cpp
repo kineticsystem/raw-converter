@@ -20,6 +20,8 @@ namespace
 
 enum Tag : uint16_t
 {
+  IMAGE_WIDTH = 256,
+  IMAGE_LENGTH = 257,
   ORIENTATION = 274,
   CFA_PATTERN = 33422,
   UNIQUE_CAMERA_MODEL = 50708,
@@ -51,9 +53,7 @@ protected:
       GTEST_SKIP() << "Run bin/fetch-samples.sh for the Adobe reference files";
     }
     adobe_ = LocalFileStore().read(adobe_path_);
-    ConvertOptions options;
-    options.bad_pixels = BadPixelMode::OFF;  // Adobe does not change the data either.
-    Converter converter(options);
+    Converter converter;  // Defaults: as Adobe, no bad pixel repaired.
     const auto result = converter.convertFile(raw_, dir_.path() / "ours.dng");
     ASSERT_EQ(result.status, ConvertResult::Status::CONVERTED) << result.error;
     ours_ = LocalFileStore().read(dir_.path() / "ours.dng");
@@ -64,10 +64,28 @@ protected:
   std::vector<uint8_t> adobe_, ours_;
 };
 
+TEST_F(AdobeReference, SameFrame)
+{
+  // Both keep the whole frame of the sensor, masked border included, and mark
+  // the image in it with ActiveArea.
+  const DngTags adobe(adobe_);
+  const DngTags ours(ours_);
+  for (uint16_t tag : { IMAGE_WIDTH, IMAGE_LENGTH, ACTIVE_AREA })
+  {
+    EXPECT_EQ(ours.values(ours.sub_ifd, tag), adobe.values(adobe.sub_ifd, tag)) << "tag " << tag;
+  }
+  // Every sample, bit for bit, and those of the raw file.
+  const Frame adobe_frame = readFrame(adobe_);
+  const Frame ours_frame = readFrame(ours_);
+  ASSERT_EQ(ours_frame.width, adobe_frame.width);
+  ASSERT_EQ(ours_frame.height, adobe_frame.height);
+  EXPECT_TRUE(ours_frame.data == adobe_frame.data);
+  EXPECT_TRUE(ours_frame.data == readFrame(LocalFileStore().read(raw_)).data);
+}
+
 TEST_F(AdobeReference, SameRawData)
 {
-  // Adobe keeps the masked border of the sensor and marks the image with
-  // ActiveArea; ours is that active area. LibRaw reads both as it.
+  // The image, as LibRaw reads it from each file.
   const Decoded adobe = readBack(adobe_);
   const Decoded ours = readBack(ours_);
   ASSERT_EQ(ours.width, adobe.width);
@@ -94,10 +112,7 @@ TEST_F(AdobeReference, SameRenderingTags)
   EXPECT_EQ(ours.values(ours.ifd0(), ORIENTATION), adobe.values(adobe.ifd0(), ORIENTATION));
   EXPECT_EQ(ours.values(ours.sub_ifd, CFA_PATTERN), adobe.values(adobe.sub_ifd, CFA_PATTERN));
 
-  // The crop of the final image: Adobe's is relative to its active area,
-  // which is our whole image.
-  const auto active = adobe.values(adobe.sub_ifd, ACTIVE_AREA);
-  ASSERT_EQ(active.size(), 4u);
+  // The crop of the final image, relative to the active area in both.
   EXPECT_EQ(ours.numbers(ours.sub_ifd, DEFAULT_CROP_ORIGIN), adobe.numbers(adobe.sub_ifd, DEFAULT_CROP_ORIGIN));
   EXPECT_EQ(ours.numbers(ours.sub_ifd, DEFAULT_CROP_SIZE), adobe.numbers(adobe.sub_ifd, DEFAULT_CROP_SIZE));
 

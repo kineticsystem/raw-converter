@@ -19,9 +19,9 @@ struct CliOptions
   std::filesystem::path input;
   std::filesystem::path output;
   bool recursive = false;
-  // No --bad-pixels given: BATCH for three files or more, PER_IMAGE
-  // otherwise, decided once the files are known.
-  bool auto_bad_pixel_mode = true;
+  // --bad-pixels auto: BATCH for three files or more, PER_IMAGE otherwise,
+  // decided once the files are known.
+  bool auto_bad_pixel_mode = false;
   std::optional<std::filesystem::path> defect_map;
   bool quiet = false;
   bool help = false;

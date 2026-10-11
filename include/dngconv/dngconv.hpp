@@ -11,6 +11,7 @@
 // or, step by step:
 //
 //   dngconv::RawImage image = dngconv::readRawFile("IMG_0001.CR2");
+//   // Optional, and off in Converter by default, as in Adobe DNG Converter:
 //   dngconv::repairBadPixels(image, dngconv::detectBadPixels(image).confident);
 //   dngconv::writeDng(image, "IMG_0001.dng");
 

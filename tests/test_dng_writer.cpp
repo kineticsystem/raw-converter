@@ -70,7 +70,7 @@ TEST(DngWriter, SmoothImageCompressesWell)
   EXPECT_LT(compressed.size() * 2, uncompressed.size());
 }
 
-TEST(DngWriter, WritesTheTagsLightroomNeeds)
+TEST(DngWriter, WritesTheTagsRawConvertersNeed)
 {
   RawImage image = makeCfaImage(300, 200);
   image.black_level = { 1023, 1024, 1025, 1026 };
@@ -104,6 +104,96 @@ TEST(DngWriter, WritesTheTagsLightroomNeeds)
   EXPECT_EQ(decoded.white, 15312u);
   EXPECT_NEAR(decoded.neutral_mul[0], 1 / 0.5, 1e-3);
   EXPECT_NEAR(decoded.neutral_mul[2], 1 / 0.6, 1e-3);
+}
+
+// An image in a sensor frame whose active area starts on an odd row, as the
+// 5D Mark II's does in Adobe's DNGs.
+RawImage makeFramedImage()
+{
+  RawImage image = makeCfaImage(300, 200);
+  image.sensor_width = 340;
+  image.sensor_height = 230;
+  image.active_area = { 13, 30, 200, 300 };
+  image.sensor.resize(340 * 230);
+  for (size_t i = 0; i < image.sensor.size(); ++i)
+  {
+    image.sensor[i] = static_cast<uint16_t>(1000 + i % 97);
+  }
+  for (uint32_t row = 0; row < 200; ++row)
+  {
+    for (uint32_t col = 0; col < 300; ++col)
+    {
+      // Not written: the image's own samples are.
+      image.sensor[(row + 13) * 340 + col + 30] = 9999;
+    }
+  }
+  return image;
+}
+
+TEST(DngWriter, StoresTheWholeSensorFrame)
+{
+  const RawImage image = makeFramedImage();
+  const auto bytes = encodeDng(image);
+  const DngTags tags(bytes);
+  EXPECT_EQ(tags.values(tags.sub_ifd, 256), (std::vector<uint32_t>{ 340 }));                 // ImageWidth
+  EXPECT_EQ(tags.values(tags.sub_ifd, 257), (std::vector<uint32_t>{ 230 }));                 // ImageLength
+  EXPECT_EQ(tags.values(tags.sub_ifd, 50829), (std::vector<uint32_t>{ 13, 30, 213, 330 }));  // ActiveArea
+  // Counted from the active area, as Adobe's are.
+  EXPECT_EQ(tags.values(tags.sub_ifd, 33422), (std::vector<uint32_t>{ 1, 2, 0, 1 }));  // CFAPattern
+  EXPECT_EQ(tags.values(tags.sub_ifd, 50719), (std::vector<uint32_t>{ 2, 2 }));        // DefaultCropOrigin
+
+  // The frame, bit for bit, with the image in its active area.
+  const Frame frame = readFrame(bytes);
+  ASSERT_EQ(frame.width, 340u);
+  ASSERT_EQ(frame.height, 230u);
+  size_t differences = 0;
+  for (uint32_t row = 0; row < 230; ++row)
+  {
+    for (uint32_t col = 0; col < 340; ++col)
+    {
+      const bool active = row >= 13 && row < 213 && col >= 30 && col < 330;
+      const uint16_t expected = active ? image.at(row - 13, col - 30) : image.sensor[row * 340 + col];
+      differences += frame.data[row * 340 + col] != expected;
+    }
+  }
+  EXPECT_EQ(differences, 0u);
+
+  // And LibRaw finds the image where ActiveArea says, but for one detail of
+  // its own: it starts an active area that begins on an odd row one row
+  // lower, as it does with Adobe's DNGs of the 5D Mark II.
+  const Decoded decoded = readBack(bytes);
+  ASSERT_EQ(decoded.width, 300u);
+  ASSERT_EQ(decoded.height, 199u);
+  EXPECT_TRUE(std::equal(decoded.data.begin(), decoded.data.end(), image.data.begin() + 300));
+  EXPECT_EQ(decoded.cfa_colors, (std::array<int, 4>{ 0, 1, 1, 2 }));  // From row 14.
+}
+
+TEST(DngWriter, RejectsAFrameThatDoesNotFitTheImage)
+{
+  RawImage image = makeFramedImage();
+  image.active_area.top = 31;  // 31 + 200 > 230.
+  EXPECT_THROW(encodeDng(image), Error);
+}
+
+TEST(DngWriter, BadPixelOpcodeCountsFromTheFrame)
+{
+  // OpcodeList1 applies to the stored image, before ActiveArea: its pixels
+  // and its phase are the frame's.
+  RawImage image = makeFramedImage();
+  image.opcode_bad_pixels = { { 3, 4 } };
+  const auto bytes = encodeDng(image);
+  const DngTags tags(bytes);
+  const auto entry = tags.reader.find(tags.sub_ifd, 51008);
+  ASSERT_TRUE(entry.has_value());
+  const uint8_t* p = bytes.data() + entry->value_offset;
+  auto be32 = [&](size_t i) {
+    return uint32_t(p[i]) << 24 | uint32_t(p[i + 1]) << 16 | uint32_t(p[i + 2]) << 8 | p[i + 3];
+  };
+  // GBRG from row 13: the frame's row 0 is a red row, so it starts with red.
+  EXPECT_EQ(be32(20), 0u);
+  EXPECT_EQ(be32(24), 1u);
+  EXPECT_EQ(be32(32), 16u);
+  EXPECT_EQ(be32(36), 34u);
 }
 
 TEST(DngWriter, BadPixelOpcodeNeedsDng13Readers)

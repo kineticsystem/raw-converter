@@ -37,30 +37,34 @@ std::string usage()
   return R"(Usage: dng-convert [options] <raw file or folder> <output folder>
 
 Converts camera raw files (Canon CR2 and the other formats LibRaw reads) to
-DNG files that Lightroom opens as it opens those of Adobe DNG Converter.
+DNG files as Adobe DNG Converter does: the raw data as the camera recorded
+it, with the same description. Optionally, repairs hot and dead pixels.
 
 Options:
   -r, --recursive         Also convert the raw files in sub-folders, mirroring
                           them in the output folder.
   -j, --jobs N            Files converted in parallel (default: one per core).
-  --bad-pixels MODE       How to find hot and dead pixels:
-                            image  each file on its own;
+  --bad-pixels MODE       Whether and how to repair hot and dead pixels:
+                            off    leave them as they are, as Adobe DNG
+                                   Converter does (default);
+                            image  find them in each file on its own;
                             batch  also learn each camera's defects from all
                                    the files, confirming the faint ones by
                                    their showing in different scenes, and
                                    repair them in all of the camera's files;
-                            off    leave the pixels as they are.
-                          Default: batch for 3 files or more, image otherwise.
+                            auto   batch for 3 files or more, image
+                                   otherwise.
   --repair METHOD         How to repair them:
-                            opcode       keep the raw data as it is, and tell
-                                         the raw converter to repair them (a
-                                         DNG FixBadPixelsList, which Lightroom
-                                         applies) (default);
-                            interpolate  replace them in the raw data, for
-                                         raw converters that ignore opcodes.
+                            interpolate  replace them in the raw data, so that
+                                         every raw converter shows them
+                                         repaired (default);
+                            opcode       keep the raw data as it is, and add
+                                         a DNG FixBadPixelsList opcode, which
+                                         only raw converters that support DNG
+                                         opcodes apply.
   --defect-map FILE       Known defects to repair, in addition to those found;
                           the file is created or updated with what this run
-                          learns, for the next run.
+                          learns, for the next run. Needs --bad-pixels.
   --uncompressed          Do not compress the raw data (lossless JPEG is the
                           default, as with Adobe DNG Converter).
   --no-preview            Do not keep the camera's JPEG preview.
@@ -180,6 +184,11 @@ CliOptions parseCommandLine(const std::vector<std::string>& args)
   if (positional.size() != 2)
   {
     throw std::invalid_argument("Expected a raw file or folder, and an output folder");
+  }
+  // A defect map would be read and ignored: the user meant to repair.
+  if (options.defect_map && !options.auto_bad_pixel_mode && options.convert.bad_pixels == BadPixelMode::OFF)
+  {
+    throw std::invalid_argument("--defect-map needs --bad-pixels image, batch or auto");
   }
   options.input = positional[0];
   options.output = positional[1];

@@ -21,6 +21,8 @@
 - [Bad Pixels](#bad-pixels)
 - [Threads](#threads)
 - [Compared with Adobe DNG Converter](#compared-with-adobe-dng-converter)
+  - [The 5D Mark III](#the-5d-mark-iii)
+  - [The 5D Mark II](#the-5d-mark-ii)
 - [The Container](#the-container)
 - [Tests](#tests)
 - [How to Extend the Converter](#how-to-extend-the-converter)
@@ -31,11 +33,11 @@
 
 This document explains how dng-converter is built, what each part is responsible for, and where to start when we want to change something. It assumes we have read the [README](../README.md) and converted a file once.
 
-It follows one idea: **a DNG is the camera's raw data, untouched, plus what a raw converter needs to know to render it**. Everything the converter does serves one of those two halves:
+It follows one idea: **a DNG is the camera's raw data, plus what a raw converter needs to know to render it**. Everything the converter does serves one of those two halves:
 - carry the sensor values across bit for bit;
-- describe them exactly as Adobe DNG Converter would, so that Lightroom renders them the same way.
+- describe them exactly as Adobe DNG Converter would, so that any raw converter renders them as it renders Adobe's DNG.
 
-Fixing bad pixels is the one exception. Even then, by default, it only adds an instruction to the file, and the values stay as they are.
+Repairing bad pixels is the one exception, and it is off by default, because Adobe DNG Converter does not do it. By default, therefore, our DNG holds the same samples as Adobe's, bit for bit, masked border included. When asked, the repaired values replace the bad ones in the active area, so that the file looks right whatever opens it, and every other sample stays as it is.
 
 ## The Big Picture
 
@@ -96,13 +98,13 @@ config:
     errorBkgColor: "#3b6fb6"
     errorTextColor: "#ffffff"
 ---
-flowchart LR
+flowchart TB
     In["CR2 file<br/>or bytes in memory"] --> Read["FileStore<br/>read"]
     Read --> Decode["RawDecoder<br/>LibRaw + TIFF reader<br/>+ CameraTable"]
     Decode --> Image["RawImage"]
     Image --> Detect["BadPixelDetector"]
     Detect --> Map["DefectMap<br/>per camera body"]
-    Map --> Repair["repair<br/>opcode or interpolate"]
+    Map --> Repair["repair<br/>interpolate or opcode"]
     Repair --> Encode["DngEncoder<br/>TIFF writer + lossless JPEG<br/>+ thumbnail"]
     Encode --> Write["FileStore<br/>write, atomically"]
     Write --> Out["DNG file"]
@@ -236,7 +238,8 @@ classDiagram
 ### RawImage
 
 [`raw_image.hpp`](../include/dngconv/raw_image.hpp) holds everything the DNG needs, in DNG's own terms:
-- the samples, row-major, black level included, exactly as the sensor recorded them;
+- the samples of the active area, row-major, black level included, exactly as the sensor recorded them;
+- the whole frame of the sensor, masked border included, and where the active area lies in it;
 - the 2x2 CFA pattern, the black level of each of its cells, the white level;
 - the default crop, the orientation;
 - the D65 colour matrix and the as-shot neutral;
@@ -256,7 +259,9 @@ The DNG calls these `PhotometricInterpretation` 32803 and 34892.
 
 `RawDecoder::decode` turns the bytes of a raw file into a `RawImage`. [`LibRawDecoder`](../src/raw_reader.cpp) is the only class that knows LibRaw.
 
-**The image is LibRaw's visible area**, i.e. the sensor without its masked border. For the 5D Mark III, that is exactly the `ActiveArea` Adobe declares, see [Compared with Adobe DNG Converter](#compared-with-adobe-dng-converter).
+**The image is the active area** of the sensor, and the whole frame, masked border included, is kept beside it, for the DNG to store as Adobe's does. Every step but the encoder works on the active area alone: the bad pixels, the thumbnail, the scene signature. The encoder writes the frame, with the active area's samples, repaired or not, in their place.
+
+**The active area** is Adobe's, from the camera table, when the camera has a row; else LibRaw's visible area. The two are the same for the 5D Mark III. For the 5D Mark II, Adobe's starts one row higher, at row 51 of the frame, and the CFA pattern and the default crop, which count from the active area's corner, shift with it. A camera without a row may therefore have an active area a row or a column off Adobe's, around the same crop.
 
 **The black level** of each CFA cell is LibRaw's, which it measures on the masked border: `black + cblack[slot]`, where `slot` is the colour index LibRaw gives that cell. The tests check it against the mean of the masked pixels.
 
@@ -266,26 +271,29 @@ The DNG calls these `PhotometricInterpretation` 32803 and 34892.
 
 **The default crop** is the crop the camera applies to its own JPEG, from Canon's maker notes (`DefaultCropAbsolute`), or else LibRaw's inset crop: 5616x3744 for the 5D Mark II, 4272x2848 for the 450D.
 
-**The unique camera model** is LibRaw's normalised name, e.g. `Canon EOS 450D` for the Digital Rebel XSi and the Kiss X2. This matters: Lightroom finds its camera profiles, "Adobe Standard" and the Camera Matching ones, by this name.
+**The orientation** is the original file's own `Orientation` tag, as Adobe DNG Converter does, and LibRaw's only when the file has none. The two can differ: the camera writes the tag according to its auto-rotate setting, while LibRaw takes Canon's maker note, which records how the camera was physically held. In Giovanni's 5D Mark II files, the tag is 1, upright, and the maker note, so LibRaw, says rotated by 270 degrees: a DNG with LibRaw's orientation opens on its side.
+
+**The unique camera model** is LibRaw's normalised name, e.g. `Canon EOS 450D` for the Digital Rebel XSi and the Kiss X2. This matters: raw converters find their profiles for a camera by this name.
 
 **The metadata** comes from LibRaw and from the original file itself. For a TIFF-based raw file, e.g. CR2, [`tiff_reader`](../src/tiff/tiff_reader.cpp) copies:
 - the EXIF and GPS directories;
 - the Make, Model, Artist and Copyright tags;
 - the maker note.
 
-The values are byte-swapped to little-endian where needed. Pointers into the original file are not copied, and neither are tags that describe the original JPEG. Copying the original EXIF keeps everything Lightroom shows, e.g. exposure compensation and flash, without listing them one by one.
+The values are byte-swapped to little-endian where needed. Pointers into the original file are not copied, and neither are tags that describe the original JPEG. Copying the original EXIF keeps everything a photo manager shows, e.g. exposure compensation and flash, without listing them one by one.
 
 ### CameraTable
 
-Some of what Lightroom needs to render a photo as Adobe's DNG does is not in the raw file. Adobe DNG Converter takes it from its own table of cameras:
+Some of what a raw converter needs to render a photo as it renders Adobe's DNG is not in the raw file. Adobe DNG Converter takes it from its own table of cameras:
 
-| Value | Effect in Lightroom |
+| Value | Effect when rendering |
 |---|---|
-| `BaselineExposure` | How bright an unedited photo opens: +0.25 EV for the 5D Mark III. |
+| `BaselineExposure` | How bright an unedited photo opens: +0.4 EV for the 5D Mark II, +0.25 EV for the 5D Mark III. |
 | `BaselineNoise`, `BaselineSharpness` | How much default noise reduction and sharpening it applies. |
 | `BayerGreenSplit` | How its demosaicing treats the two greens. |
+| `ActiveArea` | Which pixels of the frame hold the image, from which the CFA pattern and the default crop count. |
 
-[`CameraTable`](../include/dngconv/camera_table.hpp) holds these values per `UniqueCameraModel`. It contains only values read from Adobe's DNGs of real files, each with its source. A camera without a row gets the DNG defaults, which means its photos open darker than Adobe's DNG of the same file. A guessed value, wrong by a few tenths of a stop, would be no better.
+[`CameraTable`](../include/dngconv/camera_table.hpp) holds these values per `UniqueCameraModel`. It contains only values read from Adobe's DNGs of real files, each with its source. A camera without a row gets the DNG defaults and LibRaw's active area, which means its photos open darker than Adobe's DNG of the same file. A guessed value, wrong by a few tenths of a stop, would be no better.
 
 `LibRawDecoder` takes the table in its constructor: `CameraTable::builtIn()` by default, or the application's own, e.g. one extended with the user's cameras.
 
@@ -305,7 +313,7 @@ Some of what Lightroom needs to render a photo as Adobe's DNG does is not in the
 ### FileStore
 
 `FileStore` reads raw files and writes DNGs. [`LocalFileStore`](../src/file_store.cpp) writes each DNG under a temporary name next to the target, then renames it, so that:
-- a reader, e.g. Lightroom watching a folder, never sees half a file;
+- a reader, e.g. a photo manager watching a folder, never sees half a file;
 - a crash never leaves a broken DNG in place of a good one.
 
 The tests use an in-memory store. An application can use one that reads from a camera, or writes to a database.
@@ -442,7 +450,7 @@ flowchart TB
         Thumb["256-pixel RGB thumbnail"]
         Tags0["DNGVersion 1.4, UniqueCameraModel<br/>ColorMatrix1 + D65, AsShotNeutral<br/>BaselineExposure ..., Orientation<br/>DNGPrivateData: the maker note"]
     end
-    IFD0 --> Raw["SubIFD 0: the raw image<br/>CFA or LinearRaw, 16 bits<br/>256x256 tiles, lossless JPEG<br/>BlackLevel, WhiteLevel, DefaultCrop<br/>OpcodeList1: bad pixels"]
+    IFD0 --> Raw["SubIFD 0: the raw image<br/>CFA: the whole frame, ActiveArea<br/>or LinearRaw, 16 bits<br/>256x256 tiles, lossless JPEG<br/>BlackLevel, WhiteLevel, DefaultCrop<br/>OpcodeList1, with --repair opcode"]
     IFD0 --> Preview["SubIFD 1: the camera's JPEG"]
     IFD0 --> Exif["EXIF: the original's, plus<br/>LensModel, LensSpecification"]
     IFD0 --> Gps["GPS, when the original has it"]
@@ -452,9 +460,11 @@ flowchart TB
 
 The file follows the [DNG 1.4 specification](https://helpx.adobe.com/camera-raw/digital-negative.html), the version Adobe DNG Converter writes:
 - `DNGBackwardVersion` is 1.1, or 1.3 when there is an opcode list.
+- A CFA image is the whole frame of the sensor, masked border included, with `ActiveArea`, as Adobe's is. `CFAPattern` and `DefaultCrop` count from the active area's corner, and `OpcodeList1`, which applies before the active area is cut out, from the frame's.
+- LibRaw, when it reads a DNG back, starts an active area that begins on an odd row one row lower. It does so with Adobe's 5D Mark II DNGs as with ours: the files are the same, and so is what LibRaw makes of them.
 - The raw image is in 256x256 tiles, as Adobe's is, and the tiles on the right and bottom edges are padded by repeating the last column and row, as TIFF requires.
 - The maker note goes into `DNGPrivateData` in Adobe's `MakN` format: the original byte order and the maker note's original offset, which readers need to follow the offsets inside it. ExifTool decodes all 255 Canon maker note tags from it.
-- `RawDataUniqueID` is a 128-bit hash of the samples, so the same photo converted twice has the same ID. Lightroom uses it to recognise copies.
+- `RawDataUniqueID` is a 128-bit hash of the samples, so the same photo converted twice has the same ID. Photo managers use it to recognise copies.
 - The camera's own JPEG preview is kept as the preview, with its sRGB colour space and its real chroma subsampling read from the JPEG itself.
 
 ## Lossless JPEG
@@ -487,13 +497,17 @@ A scene is recognised by its `sceneSignature`: an 8x8 grid of brightness in stop
 
 A suspect seen in at least 2 different scenes, and in at least a quarter of the camera's scenes, is confirmed. It is then repaired in *every* shot of that camera, including those where the scene hides it. The confirmed defects can be saved and loaded (`--defect-map`), so that what one batch learns serves the next.
 
-**Repair.** With `OPCODE`, the default, the samples stay as they are, and the DNG gets a `FixBadPixelsList` opcode in `OpcodeList1`. Lightroom and Camera Raw apply it when rendering, and the original values remain in the file. The opcode is marked optional, so a reader that cannot apply opcodes still opens the file. With `INTERPOLATE`, the samples are replaced by the median of their same-colour neighbours, for raw converters that ignore opcodes.
+**Off by default.** As Adobe DNG Converter, the converter repairs nothing unless asked: `BadPixelMode::OFF` in `ConvertOptions`, `--bad-pixels off` in the tool. Then the DNG holds every sample as the camera recorded it.
+
+**Repair.** With `INTERPOLATE`, the default when repairing, each bad sample is replaced by the median of its same-colour neighbours, in the raw data itself. Every raw converter then shows it repaired, whether it knows DNG opcodes or not. With `OPCODE`, the samples stay as they are, and the DNG gets a `FixBadPixelsList` opcode in `OpcodeList1`, which a raw converter that supports opcodes applies when rendering. The opcode is marked optional, so a reader that cannot apply opcodes still opens the file, with the bad pixels in it.
+
+Adobe DNG Converter does neither: its DNGs of the 5D Mark II files are the CR2's samples, bit for bit, with no opcode (see [The 5D Mark II](#the-5d-mark-ii)). Adobe's own raw converters hide hot pixels when rendering, by their own means, which other raw converters do not share.
 
 **What it finds on the samples.** The 5D Mark II file at ISO 800 has 22 confident hot pixels and 18 suspects. The one with a 1.6 s exposure at ISO 100 has 8 confident and 644 suspects. The confident ones are single spikes, e.g. a green at 456 among greens near 50. The suspects of the long exposure are faint warm pixels and the edges of fine detail, which one shot cannot tell apart: that is what the scene confirmation decides. Before the cross-colour test, that file had 2810 suspects. The 5D Mark III sample, the 450D's, and three 5D Mark II shots of a bright scene have none or one or two.
 
 ## Threads
 
-`Converter` converts one file per thread, up to one thread per core and at most 8 by default. Each file in flight takes about 150 MB: the file, LibRaw's buffers, the image and the encoded DNG. When there are fewer files than threads, the threads left over compress the tiles of each file.
+`Converter` converts one file per thread, up to one thread per core and at most 8 by default. Each file in flight takes about 150 MB: the file, LibRaw's buffers, the image, the sensor frame and the encoded DNG. When there are fewer files than threads, the threads left over compress the tiles of each file.
 
 [`parallelFor`](../src/parallel.hpp) is the only place that starts threads:
 - An exception thrown on a thread is caught, the other threads finish, and the first exception is rethrown to the caller. An exception that escaped a thread would end the whole program, i.e. the application that links the library.
@@ -505,12 +519,14 @@ A suspect seen in at least 2 different scenes, and in at least a quarter of the 
 
 ## Compared with Adobe DNG Converter
 
-raw.pixls.us has a 5D Mark III raw file, `5G4A9394.CR2`, and the DNG that Adobe DNG Converter 9.8 made of it, both in the public domain. `bin/fetch-samples.sh` downloads them, and `test_adobe_reference` compares our DNG with Adobe's:
+### The 5D Mark III
+
+raw.pixls.us has a 5D Mark III raw file, `5G4A9394.CR2`, and the DNG that Adobe DNG Converter 9.8 made of it, both in the public domain. `bin/fetch-samples.sh` downloads them, and `test_adobe_reference` compares our DNG, made with the default settings, with Adobe's:
 
 | | Adobe DNG Converter 9.8 | dng-converter |
 |---|---|---|
-| Raw samples | — | **identical**, all 22 430 520 of the active area |
-| Image stored | the whole sensor, 5920x3950, with `ActiveArea` | the active area, 5796x3870 |
+| Raw samples | — | **identical**, all 23 384 000 of the frame |
+| Image stored | the whole sensor, 5920x3950, with `ActiveArea` 80 122 3950 5918 | identical |
 | DefaultCrop, CFA pattern, orientation | — | identical |
 | UniqueCameraModel | `Canon EOS 5D Mark III` | identical |
 | D65 colour matrix | `ColorMatrix2` | identical, as `ColorMatrix1` |
@@ -521,15 +537,33 @@ raw.pixls.us has a 5D Mark III raw file, `5G4A9394.CR2`, and the DNG that Adobe 
 | White level | 15000 | 15321, Canon's clipping level at ISO 200 |
 | Embedded profile | Adobe Standard, with its HueSat and look tables | none |
 | Previews | Adobe's renderings, 1024 pixels and full size | the camera's JPEG, full size |
-| Bad pixels | not changed | not changed (default `OPCODE`) |
+| Bad pixels | not changed | not changed (default `OFF`) |
 
 **What the differences mean.**
 - **White level**: ours makes a photo 0.035 EV darker than Adobe's (12 953 levels above black against 13 274), and keeps the brightest 2% of Adobe's range as highlight detail rather than clipped white.
-- **Embedded profile**: Lightroom applies its own Adobe Standard profile, found by `UniqueCameraModel`, so it is not needed in the file. It is also Adobe's copyrighted data, which we must not copy.
+- **Embedded profile**: Adobe's raw converters apply their own Adobe Standard profile, found by `UniqueCameraModel`, and other raw converters use their own profiles or the colour matrix, so it is not needed in the file. It is also Adobe's copyrighted data, which we must not copy.
 - **Matrices**: the extra matrices only matter to a raw converter that has no profile of its own for the camera.
-- **Previews**: Lightroom renders its own previews on import.
+- **Previews**: raw converters and photo managers render their own previews from the raw data.
 
 Rendered by LibRaw, with each DNG's own tags, the two files have the same colour balance, to 0.5%.
+
+### The 5D Mark II
+
+Ten of Giovanni's own 5D Mark II files, `capt0526.cr2` to `capt0535.cr2`, were converted with Adobe DNG Converter 16.3 and its default settings: lossless compression, medium JPEG preview, fast load data, no embedded original. The ten are shots of one scene, at ISO 400 and 0.8 s, with an MP-E 65 mm macro lens. They are private, so they are compared by hand, not in the tests:
+
+| | Adobe DNG Converter 16.3 | dng-converter |
+|---|---|---|
+| Raw samples | the CR2's, bit for bit, all 22 032 768 of the frame | **identical** |
+| Bad pixels | about 70 hot pixels per file, left in, with no opcode | identical by default; with `--bad-pixels image`, the same 66 to 75 per file repaired in the raw data, and no other sample changed |
+| Image stored | the whole sensor, 5792x3804, with `ActiveArea` 51 158 3804 5792 | identical |
+| DefaultCrop, CFA pattern | — | identical |
+| Orientation | 1, the CR2's own | identical |
+| UniqueCameraModel, D65 colour matrix, AsShotNeutral | — | identical |
+| BaselineExposure, BaselineNoise, BaselineSharpness, BayerGreenSplit | 0.4, 0.8, 1.2, 100, the same in all ten | identical, from the camera table |
+| Black level | 1024 on every cell | 1024 or 1025, from the masked pixels |
+| White level | 15600 | 15312, Canon's clipping level at ISO 400 |
+| DNGVersion | 1.7 | 1.4 |
+| `NewRawImageDigest`, `NoiseProfile`, embedded profile | yes | no |
 
 ## The Container
 
@@ -542,12 +576,12 @@ The container is defined in [`docker/docker-compose.yml`](../docker/docker-compo
 
 | Test | What it covers |
 |---|---|
-| `test_dng_writer` | Random 16-bit samples, CFA and linear, compressed and not, at sizes that cut tiles, read back bit for bit by LibRaw. The tags Lightroom needs, their types and values. The opcode list, byte by byte. EXIF copy and lens fields. Rejecting inconsistent images. Atomic replacement. |
+| `test_dng_writer` | Random 16-bit samples, CFA and linear, compressed and not, at sizes that cut tiles, read back bit for bit by LibRaw. A sensor frame with an active area from an odd row: every sample of the frame, `ActiveArea`, and the opcode's pixels and phase counted from the frame. The tags raw converters need, their types and values. The opcode list, byte by byte. EXIF copy and lens fields. Rejecting inconsistent images. Atomic replacement. |
 | `test_bad_pixels` | No false defects in clean noise. Hot, stuck and dead pixels found. Faint warm pixels are suspects. Stars and highlights left alone. Repair from same-colour neighbours only. Confirmation by different scenes, not by a repeated one. Scene signatures don't depend on exposure. The defect map's text format, CRLF included. |
-| `test_converter` | With fakes: per-image and batch repair, opcode against interpolation, `OFF`, skipping existing files, one bad file not stopping a batch, cancellation, a progress callback that throws, 40 files on 8 threads in order, defects outside the image. `planJobs`: extensions, recursion, duplicate names. |
+| `test_converter` | With fakes: nothing repaired by default, per-image and batch repair, opcode against interpolation, skipping existing files, one bad file not stopping a batch, cancellation, a progress callback that throws, 40 files on 8 threads in order, defects outside the image. `planJobs`: extensions, recursion, duplicate names. |
 | `test_cli_options` | Every option, the help, the errors, the automatic bad-pixel mode. |
-| `test_samples` | Every raw file of `samples` and `~/user-samples`: converted, read back by LibRaw, compared with the original's samples (only the repaired pixels may differ), black level, CFA, white balance, and the unique camera model. |
-| `test_adobe_reference` | Our DNG of the 5D Mark III sample against Adobe's: raw data, crop, matrix, white balance, camera traits. |
+| `test_samples` | Every raw file of `samples` and `~/user-samples`: with the default settings, the whole frame identical to the original's, bit for bit. With repair, converted, read back by LibRaw, compared with the original's samples (only the repaired pixels may differ), black level, CFA, white balance, the unique camera model, and the original's own orientation. |
+| `test_adobe_reference` | Our DNG of the 5D Mark III sample against Adobe's: the whole frame, sample by sample, its size and `ActiveArea`, crop, matrix, white balance, camera traits. |
 | `dng_convert_exiftool_validate` | The command line tool on all samples, every DNG checked by `exiftool -validate`. |
 
 LibRaw's DNG reader misplaces the samples of images narrower than one tile, or exactly two tiles (512 pixels) wide: [`dng.cpp:100` and `:111`](https://github.com/LibRaw/LibRaw/blob/0.21.2/src/decoders/dng.cpp#L96-L113) assume the tiles of a wider image. No camera makes such images, and the files are valid, so the round-trip tests use other sizes.
@@ -570,13 +604,13 @@ LibRaw's DNG reader misplaces the samples of images narrower than one tile, or e
 
 **LibRaw to decode, our own code to write.** LibRaw is the most complete open decoder of raw files, and it is LGPL or CDDL, which an MIT project can link. For writing, the reference is Adobe's DNG SDK, but its licence is Adobe's own, not an open-source one: this project uses none of it. Other open converters are in other languages (dnglab, in Rust) or unmaintained and GPL (raw2dng). A DNG writer is a TIFF writer, a lossless JPEG encoder and a list of tags: about 2000 lines, all of them tested against independent readers.
 
-**The active area, not the whole sensor.** Adobe also stores the masked border, which only a raw converter that measures its own black level uses. Storing the active area is simpler and smaller, and gives the same image: the tests prove the samples identical.
+**The whole sensor, as Adobe stores it.** Storing only the active area gives the same pixels inside the crop, but not the same file: a raw converter may measure the black level on the masked border, or use the pixels around the crop when it demosaics the edges, and Adobe's active area can differ from LibRaw's by a row. Stored as Adobe stores it, the frame leaves nothing to argue about: the tests compare the two files sample by sample. The price is the masked border, about 4% of the samples of a 5D Mark II, and a second copy of the frame in memory, about 44 MB.
 
-**One colour matrix.** Adobe writes a second matrix, for standard light A, and forward matrices, from its own camera profiles, which are its copyrighted data. LibRaw only has the D65 matrix, which is the one Lightroom uses when it has no profile of its own for the camera. For a camera Lightroom knows, it uses its own profile, so only the colour of an unknown camera's photos under tungsten light can differ.
+**One colour matrix.** Adobe writes a second matrix, for standard light A, and forward matrices, from its own camera profiles, which are its copyrighted data. LibRaw only has the D65 matrix, which is the one a raw converter uses when it has no profile of its own for the camera. For a camera it knows, it uses its own profile, so only the colour of an unknown camera's photos under tungsten light can differ.
 
-**The camera's JPEG as the preview.** Rendering a preview as good as Adobe's would mean a full raw converter. The camera's JPEG is better than anything simpler, costs nothing, and is what the camera showed. Lightroom renders its own previews anyway.
+**The camera's JPEG as the preview.** Rendering a preview as good as Adobe's would mean a full raw converter. The camera's JPEG is better than anything simpler, costs nothing, and is what the camera showed. Raw converters render their own previews anyway.
 
-**Opcode by default.** Adobe DNG Converter never changes the raw data. A detector can mistake a single-pixel light source of one saturated colour, e.g. a distant red LED, for a hot pixel, and an opcode keeps the original value in the file. `INTERPOLATE` is there for raw converters that ignore opcodes.
+**No repair by default; in the raw data when asked.** By default, the DNG holds what the camera recorded, as Adobe's does, so that the two tools make the same file and nothing is lost. Adobe DNG Converter leaves the bad pixels in, because Adobe's own raw converters hide them; other raw converters show them. When asked, the repair goes into the raw data, because many raw converters ignore DNG opcodes, or apply only some of them. The price: a pixel taken for a defect by mistake, e.g. a distant red LED, a single-pixel light source of one saturated colour, loses its original value. `--repair opcode` keeps it, for a raw converter that applies the opcode.
 
 **Defects confirmed by different scenes.** Counting the shots of a camera would let a tripod sequence confirm its own detail. Counting scenes doesn't, at the cost of needing photos of more than one scene before a faint defect is repaired.
 
@@ -586,8 +620,8 @@ LibRaw's DNG reader misplaces the samples of images narrower than one tile, or e
 
 ## Known Limitations
 
-- **Unknown cameras open darker** than Adobe's DNG, by their baseline exposure, typically 0.25 to 0.5 EV for Canon, until their row is added to the camera table. **The 5D Mark II and the 450D have no row yet**: we have no Adobe DNG of either.
-- **No `NewRawImageDigest`.** Lightroom's "Validate DNG Files" reports these files as having no digest to validate, rather than as damaged.
+- **Unknown cameras open darker** than Adobe's DNG, by their baseline exposure, typically 0.25 to 0.5 EV for Canon, until their row is added to the camera table. **The 450D has no row yet**: we have no Adobe DNG of it.
+- **No `NewRawImageDigest`.** A DNG validator, e.g. Adobe's, reports these files as having no digest to validate, rather than as damaged.
 - **No embedded original raw file** (Adobe's "Embed Original Raw File" option).
 - **Fujifilm X-Trans and other non-Bayer sensors** are refused with an error.
 - **POSIX only, for now**: `getpid` and `localtime_r`. Windows needs their equivalents.

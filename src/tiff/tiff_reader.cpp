@@ -244,6 +244,18 @@ void copyTiffMetadata(const uint8_t* data, size_t size, Metadata& metadata)
   ascii(0x013b, metadata.artist);
   ascii(0x8298, metadata.copyright);
 
+  // The orientation the camera wrote, which follows its auto-rotate setting.
+  // Canon's maker note records a physical one, which can differ, and which
+  // LibRaw takes: this one is what the camera itself shows.
+  if (auto entry = reader->find(ifd0, 0x0112))
+  {
+    const auto value = reader->readUInt(*entry);
+    if (value && *value >= 1 && *value <= 8)
+    {
+      metadata.orientation = static_cast<uint16_t>(*value);
+    }
+  }
+
   if (auto exif_ptr = reader->find(ifd0, TAG_EXIF_IFD))
   {
     if (auto exif_offset = reader->readUInt(*exif_ptr))

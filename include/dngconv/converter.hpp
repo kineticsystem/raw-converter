@@ -35,17 +35,20 @@ enum class BadPixelRepair
   // Replace the values in the raw data, which every raw converter then shows
   // repaired.
   INTERPOLATE,
-  // Keep the original values and add a DNG FixBadPixelsList opcode, which
-  // Lightroom and Camera Raw apply when rendering.
+  // Keep the original values and add a DNG FixBadPixelsList opcode, which a
+  // raw converter that supports DNG opcodes applies when rendering; one that
+  // does not shows the pixels unrepaired.
   OPCODE,
 };
 
 struct ConvertOptions
 {
-  BadPixelMode bad_pixels = BadPixelMode::PER_IMAGE;
-  // OPCODE by default: the raw data is never changed, as with Adobe DNG
-  // Converter, so a pixel taken for a defect by mistake can be restored.
-  BadPixelRepair repair = BadPixelRepair::OPCODE;
+  // OFF by default, as Adobe DNG Converter: the raw data is written as the
+  // camera recorded it.
+  BadPixelMode bad_pixels = BadPixelMode::OFF;
+  // When bad pixels are repaired, INTERPOLATE by default: the DNG is then
+  // repaired whatever opens it.
+  BadPixelRepair repair = BadPixelRepair::INTERPOLATE;
   // Used to make the default detector; ignored when one is injected.
   BadPixelOptions detection;
   // A suspect pixel is confirmed as a defect when found in shots of at least

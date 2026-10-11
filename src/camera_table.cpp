@@ -16,15 +16,20 @@ namespace
 // values with exiftool:
 //
 //   exiftool -n -UniqueCameraModel -BaselineExposure -BaselineNoise
-//     -BaselineSharpness -BayerGreenSplit file.dng
+//     -BaselineSharpness -BayerGreenSplit -SubIFD:ActiveArea file.dng
 //
 // Guesses do not belong here: a camera without a row gets the DNG defaults.
 CameraTable makeBuiltIn()
 {
   CameraTable table;
+  table.set("Canon EOS 5D Mark II", { 0.4, 0.8, 1.2, 100,
+                                      "Adobe DNG Converter 16.3 on ten of Giovanni's own CR2 files (capt0526 to "
+                                      "capt0535, ISO 400), all with the same values",
+                                      std::array<uint32_t, 4>{ 51, 158, 3804, 5792 } });
   table.set("Canon EOS 5D Mark III", { 0.25, 0.8, 1.2, 100,
                                        "Adobe DNG Converter 9.8 on raw.pixls.us sample 771 (5G4A9394.CR2, ISO 200), "
-                                       "its DNG being sample 1024" });
+                                       "its DNG being sample 1024",
+                                       std::array<uint32_t, 4>{ 80, 122, 3950, 5918 } });
   return table;
 }
 

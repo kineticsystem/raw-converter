@@ -92,4 +92,35 @@ inline Decoded readBack(const std::vector<uint8_t>& dng)
   return out;
 }
 
+// The whole frame a CFA file stores, masked border included, as LibRaw reads
+// it: from a raw file or a DNG alike.
+struct Frame
+{
+  uint32_t width = 0;
+  uint32_t height = 0;
+  std::vector<uint16_t> data;
+};
+
+inline Frame readFrame(const std::vector<uint8_t>& file)
+{
+  auto raw = std::make_unique<LibRaw>();
+  if (raw->open_buffer(file.data(), file.size()) != LIBRAW_SUCCESS || raw->unpack() != LIBRAW_SUCCESS ||
+      raw->imgdata.rawdata.raw_image == nullptr)
+  {
+    throw std::runtime_error("LibRaw cannot read the CFA frame");
+  }
+  const auto& d = raw->imgdata;
+  Frame out;
+  out.width = d.sizes.raw_width;
+  out.height = d.sizes.raw_height;
+  const size_t pitch = d.sizes.raw_pitch / 2;
+  out.data.resize(static_cast<size_t>(out.width) * out.height);
+  for (uint32_t row = 0; row < out.height; ++row)
+  {
+    std::copy(d.rawdata.raw_image + row * pitch, d.rawdata.raw_image + row * pitch + out.width,
+              out.data.begin() + static_cast<size_t>(row) * out.width);
+  }
+  return out;
+}
+
 }  // namespace dngconv::test

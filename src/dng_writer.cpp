@@ -76,6 +76,7 @@ enum Tag : uint16_t
   CALIBRATION_ILLUMINANT_1 = 50778,
   ORIGINAL_RAW_FILE_NAME = 50827,
   RAW_DATA_UNIQUE_ID = 50781,
+  ACTIVE_AREA = 50829,
   PREVIEW_APPLICATION_NAME = 50966,
   PREVIEW_APPLICATION_VERSION = 50967,
   PREVIEW_COLOR_SPACE = 50970,
@@ -132,14 +133,57 @@ std::vector<uint32_t> fraction(double value)
   return { static_cast<uint32_t>(std::lround(value * 1000)), 1000 };
 }
 
-// The tiles of the image, encoded, in TIFF order (left to right, top to
-// bottom). Tiles across the right and bottom edges are padded by repeating
+// The image the raw directory stores: the whole frame of the sensor, with
+// the image's samples, repaired or not, in its active area; or, without a
+// frame, the image alone.
+class StoredImage
+{
+public:
+  explicit StoredImage(const RawImage& image)
+    : image_(image)
+    , frame_(!image.sensor.empty())
+    , width(frame_ ? image.sensor_width : image.width)
+    , height(frame_ ? image.sensor_height : image.height)
+    , top(frame_ ? image.active_area.top : 0)
+    , left(frame_ ? image.active_area.left : 0)
+  {
+  }
+
+  uint16_t at(uint32_t row, uint32_t col, uint32_t sample) const
+  {
+    if (row >= top && col >= left && row - top < image_.height && col - left < image_.width)
+    {
+      return image_.at(row - top, col - left, sample);
+    }
+    return image_.sensor[static_cast<size_t>(row) * width + col];
+  }
+
+  bool hasFrame() const
+  {
+    return frame_;
+  }
+
+private:
+  const RawImage& image_;
+  bool frame_;
+
+public:
+  const uint32_t width;
+  const uint32_t height;
+  // Where the image's first sample is.
+  const uint32_t top;
+  const uint32_t left;
+};
+
+// The tiles of the stored image, encoded, in TIFF order (left to right, top
+// to bottom). Tiles across the right and bottom edges are padded by repeating
 // the last column and row, as Adobe DNG Converter does.
 std::vector<std::vector<uint8_t>> encodeTiles(const RawImage& image, Compression compression, unsigned threads)
 {
+  const StoredImage stored(image);
   const uint32_t spp = image.samples_per_pixel;
-  const uint32_t across = (image.width + TILE_SIZE - 1) / TILE_SIZE;
-  const uint32_t down = (image.height + TILE_SIZE - 1) / TILE_SIZE;
+  const uint32_t across = (stored.width + TILE_SIZE - 1) / TILE_SIZE;
+  const uint32_t down = (stored.height + TILE_SIZE - 1) / TILE_SIZE;
   std::vector<std::vector<uint8_t>> tiles(static_cast<size_t>(across) * down);
 
   auto encode = [&](size_t index) {
@@ -148,13 +192,13 @@ std::vector<std::vector<uint8_t>> encodeTiles(const RawImage& image, Compression
     std::vector<uint16_t> samples(static_cast<size_t>(TILE_SIZE) * TILE_SIZE * spp);
     for (uint32_t y = 0; y < TILE_SIZE; ++y)
     {
-      const uint32_t row = std::min(tile_top + y, image.height - 1);
+      const uint32_t row = std::min(tile_top + y, stored.height - 1);
       for (uint32_t x = 0; x < TILE_SIZE; ++x)
       {
-        const uint32_t col = std::min(tile_left + x, image.width - 1);
+        const uint32_t col = std::min(tile_left + x, stored.width - 1);
         for (uint32_t s = 0; s < spp; ++s)
         {
-          samples[(static_cast<size_t>(y) * TILE_SIZE + x) * spp + s] = image.at(row, col, s);
+          samples[(static_cast<size_t>(y) * TILE_SIZE + x) * spp + s] = stored.at(row, col, s);
         }
       }
     }
@@ -183,16 +227,28 @@ std::vector<std::vector<uint8_t>> encodeTiles(const RawImage& image, Compression
 }
 
 // The DNG FixBadPixelsList opcode, in OpcodeList1, which is applied to the
-// raw data as read from the file. Opcode lists are always big-endian.
+// raw data as read from the file: its pixels and its phase are those of the
+// stored image, whole frame included. Opcode lists are always big-endian.
 std::vector<uint8_t> badPixelOpcodeList(const RawImage& image, std::vector<PixelPos> pixels)
 {
+  const StoredImage stored(image);
+  for (auto& pixel : pixels)
+  {
+    pixel.row += stored.top;
+    pixel.col += stored.left;
+  }
   std::sort(pixels.begin(), pixels.end());
   pixels.erase(std::unique(pixels.begin(), pixels.end()), pixels.end());
 
-  // The phase of the Bayer pattern at the top-left pixel: 0 = red, 1 = green
-  // on a red row, 2 = green on a blue row, 3 = blue.
+  // The phase of the Bayer pattern at the stored image's top-left pixel: 0 =
+  // red, 1 = green on a red row, 2 = green on a blue row, 3 = blue. The
+  // image's pattern starts at the active area.
+  std::array<uint8_t, 4> p{};
+  for (uint32_t i = 0; i < 4; ++i)
+  {
+    p[i] = image.cfa_pattern[((i / 2 + stored.top) & 1) * 2 + ((i % 2 + stored.left) & 1)];
+  }
   uint32_t phase = 0;
-  const auto& p = image.cfa_pattern;
   if (p[0] == 1)
   {
     phase = p[1] == 0 ? 1 : 2;
@@ -225,8 +281,8 @@ std::vector<uint8_t> badPixelOpcodeList(const RawImage& image, std::vector<Pixel
 }
 
 // RawDataUniqueID: 16 bytes that tell this raw image from any other, and that
-// are the same for every DNG made from it, which is how Lightroom recognises
-// two copies of one photo. Any 16 unique bytes will do: here, two 64-bit
+// are the same for every DNG made from it, which is how photo managers
+// recognise two copies of one photo. Any 16 unique bytes will do: here, two 64-bit
 // FNV-1a hashes of the samples and the size, from different seeds.
 std::vector<uint8_t> rawDataUniqueId(const RawImage& image)
 {
@@ -312,7 +368,8 @@ std::shared_ptr<Ifd> exifIfd(const Metadata& metadata)
   }
 
   // The EXIF 2.3 lens and body fields, which older cameras such as the 5D Mark
-  // II only have in their maker notes, and Lightroom shows and filters by.
+  // II only have in their maker notes, and which photo managers show and
+  // filter by.
   bool added = false;
   if (!exif->has(LENS_MODEL) && !metadata.lens_model.empty())
   {
@@ -439,6 +496,17 @@ void validate(const RawImage& image)
   {
     throw Error("The samples per pixel do not match the image layout");
   }
+  if (!image.sensor.empty())
+  {
+    const Rect& a = image.active_area;
+    if (image.layout != RawLayout::CFA ||
+        image.sensor.size() != static_cast<size_t>(image.sensor_width) * image.sensor_height ||
+        a.height != image.height || a.width != image.width || a.top + a.height > image.sensor_height ||
+        a.left + a.width > image.sensor_width)
+    {
+      throw Error("The sensor frame does not match the image");
+    }
+  }
 }
 
 }  // namespace
@@ -462,8 +530,9 @@ std::vector<uint8_t> encodeDng(const RawImage& image, const DngWriteOptions& opt
   // The raw image.
   auto raw = std::make_shared<Ifd>();
   raw->addLong(NEW_SUBFILE_TYPE, { 0 });
-  raw->addLong(IMAGE_WIDTH, { image.width });
-  raw->addLong(IMAGE_LENGTH, { image.height });
+  const StoredImage stored(image);
+  raw->addLong(IMAGE_WIDTH, { stored.width });
+  raw->addLong(IMAGE_LENGTH, { stored.height });
   raw->addShort(BITS_PER_SAMPLE, std::vector<uint16_t>(image.samples_per_pixel, 16));
   raw->addShort(COMPRESSION,
                 { options.compression == Compression::LOSSLESS_JPEG ? COMPRESSION_JPEG : COMPRESSION_NONE });
@@ -487,6 +556,12 @@ std::vector<uint8_t> encodeDng(const RawImage& image, const DngWriteOptions& opt
     raw->addShort(BLACK_LEVEL_REPEAT_DIM, { 1, 1 });
     raw->addRational(BLACK_LEVEL, { image.black_level.begin(), image.black_level.begin() + 3 }, 100);
     raw->addLong(WHITE_LEVEL, std::vector<uint32_t>(3, image.white_level));
+  }
+  if (stored.hasFrame())
+  {
+    // The image within the frame. The CFA pattern and the default crop count
+    // from its top-left corner.
+    raw->addLong(ACTIVE_AREA, { stored.top, stored.left, stored.top + image.height, stored.left + image.width });
   }
   raw->addRationalPairs(DEFAULT_SCALE, { 1, 1, 1, 1 });
   Rect crop = image.default_crop;

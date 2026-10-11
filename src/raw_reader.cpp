@@ -106,7 +106,8 @@ void readMetadata(const LibRaw& raw, Metadata& metadata)
   metadata.make = trim(d.idata.make);
   const std::string model = trim(d.idata.model);
   metadata.model = model.rfind(metadata.make, 0) == 0 ? model : metadata.make + " " + model;
-  // Adobe's name for the camera, which is how Lightroom finds its profiles.
+  // Adobe's name for the camera, by which raw converters find their profiles
+  // for it.
   // LibRaw gives every regional name of a camera the same normalised name,
   // e.g. "EOS 450D" for the Digital Rebel XSi and the Kiss X2.
   const std::string normalized_make = trim(d.idata.normalized_make);
@@ -219,8 +220,10 @@ void readCrop(const LibRaw& raw, RawImage& image)
   {
     return;
   }
-  top -= sizes.top_margin;
-  left -= sizes.left_margin;
+  // Relative to the image: the active area, or LibRaw's when the whole frame
+  // is not kept.
+  top -= image.sensor.empty() ? sizes.top_margin : image.active_area.top;
+  left -= image.sensor.empty() ? sizes.left_margin : image.active_area.left;
   if (top < 0 || left < 0 || top + height > image.height || left + width > image.width)
   {
     return;
@@ -229,7 +232,7 @@ void readCrop(const LibRaw& raw, RawImage& image)
                          static_cast<uint32_t>(width) };
 }
 
-void readCfa(LibRaw& raw, RawImage& image, const std::string& name)
+void readCfa(LibRaw& raw, RawImage& image, const std::string& name, const CameraTraits* traits)
 {
   const auto& d = raw.imgdata;
   if (d.idata.filters == 9)
@@ -258,17 +261,34 @@ void readCfa(LibRaw& raw, RawImage& image, const std::string& name)
     }
   }
 
+  // The active area: Adobe's for the camera when the table has it, else
+  // LibRaw's. They can differ: LibRaw starts the 5D Mark II's one row lower.
+  const auto& sizes = d.sizes;
+  Rect active{ sizes.top_margin, sizes.left_margin, sizes.height, sizes.width };
+  if (traits != nullptr && traits->active_area)
+  {
+    const auto& a = *traits->active_area;
+    if (a[0] < a[2] && a[1] < a[3] && a[2] <= sizes.raw_height && a[3] <= sizes.raw_width)
+    {
+      active = { a[0], a[1], a[2] - a[0], a[3] - a[1] };
+    }
+  }
+
   image.layout = RawLayout::CFA;
   image.samples_per_pixel = 1;
-  image.width = d.sizes.width;
-  image.height = d.sizes.height;
+  image.width = active.width;
+  image.height = active.height;
   image.bits_per_sample = d.color.raw_bps > 0 ? d.color.raw_bps : 16;
 
+  // LibRaw's COLOR() counts from its own active area. The pattern repeats
+  // every two rows and columns, so only the parity of the shift matters.
+  const int row_shift = ((static_cast<int>(active.top) - sizes.top_margin) % 2 + 2) % 2;
+  const int col_shift = ((static_cast<int>(active.left) - sizes.left_margin) % 2 + 2) % 2;
   const auto& color = d.color;
   for (int i = 0; i < 4; ++i)
   {
-    const int row = i / 2;
-    const int col = i % 2;
+    const int row = i / 2 + row_shift;
+    const int col = i % 2 + col_shift;
     const int slot = raw.COLOR(row, col);
     const uint8_t rgb = colorOfSlot(raw, slot);
     if (rgb > 2)
@@ -285,12 +305,23 @@ void readCfa(LibRaw& raw, RawImage& image, const std::string& name)
   }
 
   const uint16_t* raw_data = d.rawdata.raw_image;
-  const size_t pitch = d.sizes.raw_pitch / 2;
+  const size_t pitch = sizes.raw_pitch / 2;
   image.data.resize(static_cast<size_t>(image.width) * image.height);
   for (uint32_t row = 0; row < image.height; ++row)
   {
-    const uint16_t* src = raw_data + (row + d.sizes.top_margin) * pitch + d.sizes.left_margin;
+    const uint16_t* src = raw_data + (row + active.top) * pitch + active.left;
     std::copy(src, src + image.width, image.data.begin() + static_cast<size_t>(row) * image.width);
+  }
+
+  // The whole frame, masked border included, as Adobe DNG Converter keeps it.
+  image.sensor_width = sizes.raw_width;
+  image.sensor_height = sizes.raw_height;
+  image.active_area = active;
+  image.sensor.resize(static_cast<size_t>(image.sensor_width) * image.sensor_height);
+  for (uint32_t row = 0; row < image.sensor_height; ++row)
+  {
+    const uint16_t* src = raw_data + row * pitch;
+    std::copy(src, src + image.sensor_width, image.sensor.begin() + static_cast<size_t>(row) * image.sensor_width);
   }
 }
 
@@ -371,10 +402,11 @@ RawImage LibRawDecoder::decode(const uint8_t* data, size_t size, const std::stri
   // The original file's own EXIF, GPS and maker note, when it is TIFF based.
   tiff::copyTiffMetadata(data, size, image.metadata);
 
+  const CameraTraits* traits = cameras_ ? cameras_->find(image.metadata.unique_camera_model) : nullptr;
   const auto& d = raw->imgdata;
   if (d.rawdata.raw_image != nullptr && d.idata.filters != 0)
   {
-    readCfa(*raw, image, file_name);
+    readCfa(*raw, image, file_name, traits);
   }
   else if (d.rawdata.color4_image != nullptr || d.rawdata.color3_image != nullptr)
   {
@@ -386,14 +418,13 @@ RawImage LibRawDecoder::decode(const uint8_t* data, size_t size, const std::stri
   }
   readColor(*raw, image);
   readCrop(*raw, image);
-  image.orientation = orientationFromFlip(d.sizes.flip);
+  // As Adobe DNG Converter does: the original's own orientation, else LibRaw's.
+  // They can differ: Canon's maker note records how the camera was held.
+  image.orientation = image.metadata.orientation != 0 ? image.metadata.orientation : orientationFromFlip(d.sizes.flip);
   readPreview(*raw, image);
-  if (cameras_)
+  if (traits != nullptr)
   {
-    if (const CameraTraits* traits = cameras_->find(image.metadata.unique_camera_model))
-    {
-      image.camera_traits = *traits;
-    }
+    image.camera_traits = *traits;
   }
   return image;
 }

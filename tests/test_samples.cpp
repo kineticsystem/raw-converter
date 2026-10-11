@@ -67,7 +67,7 @@ TEST_P(Samples, ConvertsLosslessly)
     EXPECT_NEAR(dng.neutral_mul[c], original.neutral_mul[c], 1e-3);
   }
 
-  // Lightroom finds its camera profiles by UniqueCameraModel, and knows each
+  // Raw converters find their camera profiles by UniqueCameraModel, and knows each
   // camera by one name only, whatever the market it was sold in.
   const std::string model = uniqueCameraModel(dng_bytes);
   const std::string name = input.filename().string();
@@ -83,6 +83,54 @@ TEST_P(Samples, ConvertsLosslessly)
   {
     EXPECT_EQ(model, "Canon EOS 5D Mark II");
   }
+}
+
+TEST_P(Samples, KeepsTheWholeFrameUnchangedByDefault)
+{
+  // As Adobe DNG Converter: every sample of the sensor, masked border
+  // included, as the camera recorded it.
+  const auto input = GetParam();
+  const auto original = LocalFileStore().read(input);
+  if (readBack(original).samples != 1)
+  {
+    GTEST_SKIP() << "not a CFA image";
+  }
+  TempDir dir;
+  Converter converter;
+  const ConvertResult result = converter.convertFile(input, dir.path() / "out.dng");
+  ASSERT_EQ(result.status, ConvertResult::Status::CONVERTED) << result.error;
+  EXPECT_EQ(result.bad_pixels_fixed, 0u);
+  const Frame raw = readFrame(original);
+  const Frame dng = readFrame(LocalFileStore().read(dir.path() / "out.dng"));
+  ASSERT_EQ(dng.width, raw.width);
+  ASSERT_EQ(dng.height, raw.height);
+  EXPECT_TRUE(dng.data == raw.data);
+}
+
+TEST_P(Samples, KeepsTheOriginalsOrientation)
+{
+  // As Adobe DNG Converter does: the orientation the camera wrote in the
+  // original's first directory, not the physical one of Canon's maker note,
+  // which can differ.
+  const auto input = GetParam();
+  const auto original = LocalFileStore().read(input);
+  auto reader = tiff::TiffReader::open(original.data(), original.size());
+  if (!reader)
+  {
+    GTEST_SKIP() << "not TIFF based";
+  }
+  auto entry = reader->find(reader->firstIfdOffset(), 274);
+  if (!entry)
+  {
+    GTEST_SKIP() << "no orientation";
+  }
+  TempDir dir;
+  Converter converter;
+  const ConvertResult result = converter.convertFile(input, dir.path() / "out.dng");
+  ASSERT_EQ(result.status, ConvertResult::Status::CONVERTED) << result.error;
+  const auto dng = LocalFileStore().read(dir.path() / "out.dng");
+  auto dng_reader = tiff::TiffReader::open(dng.data(), dng.size());
+  EXPECT_EQ(dng_reader->readUInt(*dng_reader->find(dng_reader->firstIfdOffset(), 274)), reader->readUInt(*entry));
 }
 
 TEST_P(Samples, OpcodeRepairKeepsEveryValue)

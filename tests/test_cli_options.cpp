@@ -15,9 +15,11 @@ TEST(CommandLine, InputAndOutput)
   const auto options = parseCommandLine({ "photos", "dng" });
   EXPECT_EQ(options.input, "photos");
   EXPECT_EQ(options.output, "dng");
-  EXPECT_TRUE(options.auto_bad_pixel_mode);
+  EXPECT_FALSE(options.auto_bad_pixel_mode);
+  EXPECT_EQ(options.convert.bad_pixels, BadPixelMode::OFF);
   EXPECT_FALSE(options.recursive);
   EXPECT_EQ(options.convert.dng.compression, Compression::LOSSLESS_JPEG);
+  EXPECT_EQ(options.convert.repair, BadPixelRepair::INTERPOLATE);
 }
 
 TEST(CommandLine, Options)
@@ -53,6 +55,9 @@ TEST(CommandLine, Errors)
   EXPECT_THROW(parseCommandLine({ "--jobs", "-1", "in", "out" }), std::invalid_argument);
   EXPECT_THROW(parseCommandLine({ "--bad-pixels", "some", "in", "out" }), std::invalid_argument);
   EXPECT_THROW(parseCommandLine({ "in", "out", "--repair" }), std::invalid_argument);
+  // Repair is off by default, and a defect map without it would do nothing.
+  EXPECT_THROW(parseCommandLine({ "--defect-map", "map.txt", "in", "out" }), std::invalid_argument);
+  EXPECT_NO_THROW(parseCommandLine({ "--defect-map", "map.txt", "--bad-pixels", "auto", "in", "out" }));
 }
 
 TEST(CommandLine, AutomaticBadPixelMode)

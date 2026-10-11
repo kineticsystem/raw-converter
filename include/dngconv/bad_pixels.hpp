@@ -54,8 +54,8 @@ struct BadPixelCandidates
 // Finds the hot, stuck and dead pixels of a CFA image. Isolated single-pixel
 // outliers are reported; detail that spans several pixels, such as a star or a
 // specular highlight, is not. A point of light of a single, saturated colour
-// can look like a defect, though: hence BadPixelRepair::OPCODE, which keeps the
-// original values. Returns nothing for a LINEAR_RAW image, whose pixels the
+// can look like a defect, though; BadPixelRepair::OPCODE keeps the original
+// values for when that matters. Returns nothing for a LINEAR_RAW image, whose pixels the
 // camera has already interpolated.
 BadPixelCandidates detectBadPixels(const RawImage& image, const BadPixelOptions& options = {});
 
