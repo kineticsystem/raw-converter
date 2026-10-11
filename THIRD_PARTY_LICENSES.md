@@ -1,10 +1,10 @@
 # Third-Party Licences
 
-dng-converter is under the [MIT licence](LICENSE). This page lists all the third-party software it uses: what it is used for, its licence, and why that licence is compatible with MIT. Nothing listed here is copied into this repository. The libraries are installed from Ubuntu's packages, and the sample files are downloaded by a script.
+raw-converter is under the [MIT licence](LICENSE). This page lists all the third-party software it uses: what it is used for, its licence, and why that licence is compatible with MIT. Nothing listed here is copied into this repository. The libraries are installed from Ubuntu's packages, and the sample files are downloaded by a script.
 
 ## Linked into the library and the tool
 
-These are what an application that uses `libdngconv`, or ships `dng-convert`, distributes alongside the code.
+These are what an application that uses `librawconv`, or ships `raw-convert`, distributes alongside the code.
 
 | Software | Used for | Licence | Compatible with MIT because |
 |---|---|---|---|

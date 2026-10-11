@@ -7,7 +7,7 @@
 #include <filesystem>
 #include <vector>
 
-namespace dngconv
+namespace rawconv
 {
 
 // Where the converter reads raw files and writes DNG files. The seam between
@@ -19,11 +19,11 @@ class FileStore
 public:
   virtual ~FileStore() = default;
 
-  // Throws dngconv::Error when the file cannot be read.
+  // Throws rawconv::Error when the file cannot be read.
   virtual std::vector<uint8_t> read(const std::filesystem::path& path) const = 0;
   // Creates the parent folders as needed. A reader never sees a partly written
   // file, and an existing file is replaced only by a complete one. Throws
-  // dngconv::Error when the file cannot be written.
+  // rawconv::Error when the file cannot be written.
   virtual void write(const std::filesystem::path& path, const std::vector<uint8_t>& bytes) = 0;
   virtual bool exists(const std::filesystem::path& path) const = 0;
 };
@@ -37,4 +37,4 @@ public:
   bool exists(const std::filesystem::path& path) const override;
 };
 
-}  // namespace dngconv
+}  // namespace rawconv

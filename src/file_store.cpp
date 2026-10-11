@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-#include "dngconv/file_store.hpp"
+#include "rawconv/file_store.hpp"
 
 #include <atomic>
 #include <fstream>
@@ -10,9 +10,9 @@
 
 #include <unistd.h>
 
-#include "dngconv/error.hpp"
+#include "rawconv/error.hpp"
 
-namespace dngconv
+namespace rawconv
 {
 
 std::vector<uint8_t> LocalFileStore::read(const std::filesystem::path& path) const
@@ -78,4 +78,4 @@ bool LocalFileStore::exists(const std::filesystem::path& path) const
   return std::filesystem::exists(path, error);
 }
 
-}  // namespace dngconv
+}  // namespace rawconv

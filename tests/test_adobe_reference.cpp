@@ -9,11 +9,11 @@
 #include <gtest/gtest.h>
 
 #include "dng_tags.hpp"
-#include "dngconv/dngconv.hpp"
+#include "rawconv/rawconv.hpp"
 #include "libraw_readback.hpp"
 #include "test_support.hpp"
 
-namespace dngconv::test
+namespace rawconv::test
 {
 namespace
 {
@@ -45,7 +45,7 @@ class AdobeReference : public ::testing::Test
 protected:
   void SetUp() override
   {
-    const std::filesystem::path samples = DNGCONV_SOURCE_DIR "/samples";
+    const std::filesystem::path samples = RAWCONV_SOURCE_DIR "/samples";
     raw_ = samples / "Canon_EOS_5D_Mark_III.CR2";
     adobe_path_ = samples / "adobe" / "Canon_EOS_5D_Mark_III.dng";
     if (!std::filesystem::exists(raw_) || !std::filesystem::exists(adobe_path_))
@@ -145,4 +145,4 @@ TEST_F(AdobeReference, SameRenderingTags)
 }
 
 }  // namespace
-}  // namespace dngconv::test
+}  // namespace rawconv::test

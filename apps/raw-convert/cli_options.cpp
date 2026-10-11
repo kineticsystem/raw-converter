@@ -5,7 +5,7 @@
 
 #include <stdexcept>
 
-namespace dngconv::cli
+namespace rawconv::cli
 {
 
 namespace
@@ -34,7 +34,7 @@ unsigned parseUnsigned(const std::string& option, const std::string& value)
 
 std::string usage()
 {
-  return R"(Usage: dng-convert [options] <raw file or folder> <output folder>
+  return R"(Usage: raw-convert [options] <raw file or folder> <output folder>
 
 Converts camera raw files (Canon CR2 and the other formats LibRaw reads) to
 DNG files as Adobe DNG Converter does: the raw data as the camera recorded
@@ -56,11 +56,11 @@ Options:
                                    otherwise.
   --repair METHOD         How to repair them:
                             interpolate  replace them in the raw data, so that
-                                         every raw converter shows them
+                                         every raw editor shows them
                                          repaired (default);
                             opcode       keep the raw data as it is, and add
                                          a DNG FixBadPixelsList opcode, which
-                                         only raw converters that support DNG
+                                         only raw editors that support DNG
                                          opcodes apply.
   --defect-map FILE       Known defects to repair, in addition to those found;
                           the file is created or updated with what this run
@@ -200,4 +200,4 @@ BadPixelMode autoBadPixelMode(size_t files)
   return files >= 3 ? BadPixelMode::BATCH : BadPixelMode::PER_IMAGE;
 }
 
-}  // namespace dngconv::cli
+}  // namespace rawconv::cli

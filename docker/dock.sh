@@ -1,7 +1,7 @@
 #! /bin/bash -e
 
 # Use this script to create, start, stop and remove a docker container to
-# build and test dng-converter.
+# build and test raw-converter.
 #
 # The container itself is defined in docker-compose.yml. This script only adds
 # what compose cannot express: the host uid/gid, the container name passed on

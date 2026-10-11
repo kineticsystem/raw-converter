@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-#include "dngconv/converter.hpp"
+#include "rawconv/converter.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -11,10 +11,10 @@
 #include <set>
 #include <thread>
 
-#include "dngconv/error.hpp"
+#include "rawconv/error.hpp"
 #include "parallel.hpp"
 
-namespace dngconv
+namespace rawconv
 {
 
 namespace
@@ -294,4 +294,4 @@ std::vector<ConvertJob> planJobs(const std::filesystem::path& input, const std::
   return jobs;
 }
 
-}  // namespace dngconv
+}  // namespace rawconv

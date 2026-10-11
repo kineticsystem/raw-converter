@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-# Configure and build the library, the dng-convert tool and the tests, in
+# Configure and build the library, the raw-convert tool and the tests, in
 # ./build. Extra arguments go to CMake, e.g. `build.sh -DCMAKE_BUILD_TYPE=Debug`.
 
 # Act on the workspace root, so that the script can be called from anywhere,

@@ -7,9 +7,9 @@
 #include <cstdint>
 #include <vector>
 
-#include "dngconv/raw_image.hpp"
+#include "rawconv/raw_image.hpp"
 
-namespace dngconv
+namespace rawconv
 {
 
 struct RgbImage
@@ -28,4 +28,4 @@ std::array<double, 9> cameraToSrgb(const RawImage& image);
 // pixels wide or high: the DNG thumbnail.
 RgbImage renderThumbnail(const RawImage& image, uint32_t max_side = 256);
 
-}  // namespace dngconv
+}  // namespace rawconv

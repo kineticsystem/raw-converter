@@ -20,9 +20,9 @@
 
 #include <unistd.h>
 
-#include "dngconv/dngconv.hpp"
+#include "rawconv/rawconv.hpp"
 
-namespace dngconv::test
+namespace rawconv::test
 {
 
 // A CFA image of a Canon-like camera, of a grey scene: every pixel at `level`
@@ -204,16 +204,16 @@ private:
 };
 
 // The raw files of the folders the end-to-end tests convert: those of the
-// DNGCONV_SAMPLE_DIRS environment variable (colon separated) if set, else
-// those the tests were configured with (CMake's DNGCONV_SAMPLE_DIRS).
+// RAWCONV_SAMPLE_DIRS environment variable (colon separated) if set, else
+// those the tests were configured with (CMake's RAWCONV_SAMPLE_DIRS).
 inline std::vector<std::filesystem::path> sampleFiles()
 {
   std::vector<std::filesystem::path> files;
-  const char* dirs = std::getenv("DNGCONV_SAMPLE_DIRS");
-#ifdef DNGCONV_SAMPLE_DIRS
+  const char* dirs = std::getenv("RAWCONV_SAMPLE_DIRS");
+#ifdef RAWCONV_SAMPLE_DIRS
   if (dirs == nullptr)
   {
-    dirs = DNGCONV_SAMPLE_DIRS;
+    dirs = RAWCONV_SAMPLE_DIRS;
   }
 #endif
   if (dirs == nullptr)
@@ -251,7 +251,7 @@ public:
   {
     static std::atomic<int> counter{ 0 };
     path_ = std::filesystem::temp_directory_path() /
-            ("dngconv-test-" + std::to_string(::getpid()) + "-" + std::to_string(counter++));
+            ("rawconv-test-" + std::to_string(::getpid()) + "-" + std::to_string(counter++));
     std::filesystem::remove_all(path_);
     std::filesystem::create_directories(path_);
   }
@@ -269,4 +269,4 @@ private:
   std::filesystem::path path_;
 };
 
-}  // namespace dngconv::test
+}  // namespace rawconv::test

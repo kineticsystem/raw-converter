@@ -1,14 +1,14 @@
-# DNG converter  <!-- omit in toc -->
+# Raw converter  <!-- omit in toc -->
 
-[![CI](https://github.com/kineticsystem/dng-converter/actions/workflows/ci.yml/badge.svg)](https://github.com/kineticsystem/dng-converter/actions/workflows/ci.yml)
-[![Format](https://github.com/kineticsystem/dng-converter/actions/workflows/ci-format.yml/badge.svg)](https://github.com/kineticsystem/dng-converter/actions/workflows/ci-format.yml)
+[![CI](https://github.com/kineticsystem/raw-converter/actions/workflows/ci.yml/badge.svg)](https://github.com/kineticsystem/raw-converter/actions/workflows/ci.yml)
+[![Format](https://github.com/kineticsystem/raw-converter/actions/workflows/ci-format.yml/badge.svg)](https://github.com/kineticsystem/raw-converter/actions/workflows/ci-format.yml)
 
 ## Table of Contents <!-- omit in toc -->
 
 - [Introduction](#introduction)
 - [Features](#features)
 - [Prerequisites](#prerequisites)
-- [Install dng-converter](#install-dng-converter)
+- [Install raw-converter](#install-raw-converter)
   - [Check out the Git Repository](#check-out-the-git-repository)
   - [Pre-Commit Hooks](#pre-commit-hooks)
   - [Build the Project](#build-the-project)
@@ -27,14 +27,14 @@
 
 ## Introduction
 
-dng-converter is a C++17 library, and a command line tool, that converts camera raw files to DNG files as Adobe DNG Converter does: the same raw data, described with the same values, so that any raw converter that reads DNG renders them as it renders Adobe's. It was written for the Canon EOS 5D Mark II and the Canon EOS 450D (Digital Rebel XSi, Kiss X2), whose CR2 files it is tested on, and converts the raw files of every camera with a Bayer sensor that [LibRaw](https://www.libraw.org) reads.
+raw-converter is a C++17 library, and a command line tool, that converts camera raw files to DNG files as Adobe DNG Converter does: the same raw data, described with the same values, so that any raw editor that reads DNG renders them as it renders Adobe's. It was written for the Canon EOS 5D Mark II and the Canon EOS 450D (Digital Rebel XSi, Kiss X2), whose CR2 files it is tested on, and converts the raw files of every camera with a Bayer sensor that [LibRaw](https://www.libraw.org) reads.
 
-On request, it also finds hot, stuck and dead pixels, and repairs them in the raw data, so that every raw converter shows them repaired. This is off by default, because Adobe DNG Converter does not do it: its DNGs keep every bad pixel, and only Adobe's own raw converters hide them, when rendering.
+On request, it also finds hot, stuck and dead pixels, and repairs them in the raw data, so that every raw editor shows them repaired. This is off by default, because Adobe DNG Converter does not do it: its DNGs keep every bad pixel, and only Adobe's own raw editors hide them, when rendering.
 
 The tool takes a raw file or a folder of them, and an output folder:
 
 ```bash
-dng-convert ~/Pictures/2009-09-02 ~/Pictures/2009-09-02/dng
+raw-convert ~/Pictures/2009-09-02 ~/Pictures/2009-09-02/dng
 ```
 
 The library does the same from code, so that a bigger application, e.g. one that downloads the pictures from the camera, converts them as they arrive. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how it is built.
@@ -42,8 +42,8 @@ The library does the same from code, so that a bigger application, e.g. one that
 ## Features
 
 - **The raw data, untouched.** The whole frame of the sensor, masked border included, is carried across bit for bit, and compressed with lossless JPEG, as Adobe DNG Converter does. The tests read each DNG back with LibRaw and compare it with the original file, sample by sample.
-- **Described as Adobe describes it.** The DNG says what a raw converter needs, with Adobe's values:
-  - the camera's name as Adobe knows it, by which raw converters find their profiles for the camera;
+- **Described as Adobe describes it.** The DNG says what a raw editor needs, with Adobe's values:
+  - the camera's name as Adobe knows it, by which raw editors find their profiles for the camera;
   - Adobe's colour matrix and the as-shot white balance;
   - the active area of the sensor, the camera's own crop and its orientation;
   - the black and white levels;
@@ -57,20 +57,20 @@ The library does the same from code, so that a bigger application, e.g. one that
 
 ## Prerequisites
 
-To build and run dng-converter, we need a computer with Docker; nothing else is installed on it. Please refer to the document [Install Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/), or run:
+To build and run raw-converter, we need a computer with Docker; nothing else is installed on it. Please refer to the document [Install Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/), or run:
 
 ```bash
 curl -fsSL https://get.docker.com -o get-docker.sh
 sudo sh get-docker.sh
 ```
 
-## Install dng-converter
+## Install raw-converter
 
 ### Check out the Git Repository
 
 ```bash
-git clone git@github.com:kineticsystem/dng-converter.git
-cd dng-converter
+git clone git@github.com:kineticsystem/raw-converter.git
+cd raw-converter
 ```
 
 ### Pre-Commit Hooks
@@ -93,8 +93,8 @@ clang-format runs as installed, so it is best to commit from the container, whic
 The project is built and tested inside a Docker container, as explained in [docker/README.md](docker/README.md). Create the container and open a shell in it:
 
 ```bash
-./docker/dock.sh dng-converter build
-./docker/dock.sh dng-converter start
+./docker/dock.sh raw-converter build
+./docker/dock.sh raw-converter start
 ```
 
 In the container, the repo is in `~/ws`, and the scripts in `bin` are on the `PATH`, with short aliases:
@@ -105,19 +105,19 @@ samples    # bin/fetch-samples.sh: download the sample raw files, once
 test       # bin/test.sh: build, then run every test
 ```
 
-The tool is then `build/apps/dng-convert/dng-convert`, which is on the `PATH` in the container too.
+The tool is then `build/apps/raw-convert/raw-convert`, which is on the `PATH` in the container too.
 
 ## Converting Files
 
 ```bash
-dng-convert [options] <raw file or folder> <output folder>
+raw-convert [options] <raw file or folder> <output folder>
 ```
 
 Each DNG is named after its raw file, e.g. `IMG_1069.CR2` becomes `IMG_1069.dng`. A DNG that already exists is skipped, unless `--overwrite` is given. For example, in the container:
 
 ```bash
 samples
-dng-convert samples /tmp/dng
+raw-convert samples /tmp/dng
 ```
 
 ```
@@ -135,7 +135,7 @@ The tool exits with 0 when every file was converted or skipped, 1 when one faile
 | `-r`, `--recursive` | Also convert the raw files in sub-folders, mirroring them in the output folder. |
 | `-j N`, `--jobs N` | Files converted in parallel. Default: one per core, at most 8, as each takes about 150 MB. |
 | `--bad-pixels MODE` | `off` (default): leave the pixels as they are, as Adobe DNG Converter does. `image`: repair the bad pixels of each file, found in it on its own. `batch`: also learn each camera's defects from all the files, and repair them in all of that camera's files. `auto`: `batch` for 3 files or more, `image` otherwise. |
-| `--repair METHOD` | How `--bad-pixels` repairs them. `interpolate` (default): replace the pixels in the raw data, so that every raw converter shows them repaired. `opcode`: keep the raw data as it is, and list the pixels in a DNG `FixBadPixelsList` opcode, which only raw converters that support DNG opcodes apply. |
+| `--repair METHOD` | How `--bad-pixels` repairs them. `interpolate` (default): replace the pixels in the raw data, so that every raw editor shows them repaired. `opcode`: keep the raw data as it is, and list the pixels in a DNG `FixBadPixelsList` opcode, which only raw editors that support DNG opcodes apply. |
 | `--defect-map FILE` | Known defects, repaired in addition to those found. The file is created, or updated with what the run learns, for the next run. Needs `--bad-pixels`. |
 | `--uncompressed` | Do not compress the raw data. The files are about twice as large. |
 | `--no-preview` | Do not keep the camera's JPEG preview. |
@@ -153,12 +153,12 @@ A pixel far out of line is repaired in any case. One only somewhat out of line c
 To keep what is learnt from one folder for the next, give a defect map, e.g. one per camera body:
 
 ```bash
-dng-convert --bad-pixels batch --defect-map ~/5d-mark-ii-defects.txt ~/Pictures/2009-09-02 ~/Pictures/dng
+raw-convert --bad-pixels batch --defect-map ~/5d-mark-ii-defects.txt ~/Pictures/2009-09-02 ~/Pictures/dng
 ```
 
 ### Opening the DNG Files
 
-Any raw converter that reads DNG opens the files. They carry the camera name, colour matrix, white balance, crop, orientation and baseline values of Adobe's DNG of the same raw file, so a raw converter that has a profile for the camera finds it, and renders the photo as it renders Adobe's DNG. By default, the raw data is the same as in Adobe's DNG, sample for sample, bad pixels included: Adobe's raw converters hide hot pixels when rendering, and other raw converters may show them. Converted with `--bad-pixels`, the files have them repaired whatever opens them.
+Any raw editor that reads DNG opens the files. They carry the camera name, colour matrix, white balance, crop, orientation and baseline values of Adobe's DNG of the same raw file, so a raw editor that has a profile for the camera finds it, and renders the photo as it renders Adobe's DNG. By default, the raw data is the same as in Adobe's DNG, sample for sample, bad pixels included: Adobe's raw editors hide hot pixels when rendering, and other raw editors may show them. Converted with `--bad-pixels`, the files have them repaired whatever opens them.
 
 One difference with Adobe DNG Converter remains for the 450D: Adobe adds a per-camera **baseline exposure**, and we do not know its value yet. Its photos open a little darker than Adobe's DNGs, typically by 0.25 to 0.5 EV, until its row is added: see [Adding a Camera](#adding-a-camera). The 5D Mark II and the 5D Mark III have their rows, read from Adobe's own DNGs.
 
@@ -166,34 +166,34 @@ One difference with Adobe DNG Converter remains for the 450D: Adobe adds a per-c
 
 ### Adding It to a CMake Project
 
-With the repo as a sub-folder of the project, e.g. a Git submodule in `modules/dng-converter`:
+With the repo as a sub-folder of the project, e.g. a Git submodule in `modules/raw-converter`:
 
 ```cmake
-add_subdirectory(modules/dng-converter)
-target_link_libraries(my_app PRIVATE dngconv::dngconv)
+add_subdirectory(modules/raw-converter)
+target_link_libraries(my_app PRIVATE rawconv::rawconv)
 ```
 
 Or fetched by CMake:
 
 ```cmake
 include(FetchContent)
-FetchContent_Declare(dngconv GIT_REPOSITORY https://github.com/kineticsystem/dng-converter.git GIT_TAG main)
-FetchContent_MakeAvailable(dngconv)
-target_link_libraries(my_app PRIVATE dngconv::dngconv)
+FetchContent_Declare(rawconv GIT_REPOSITORY https://github.com/kineticsystem/raw-converter.git GIT_TAG main)
+FetchContent_MakeAvailable(rawconv)
+target_link_libraries(my_app PRIVATE rawconv::rawconv)
 ```
 
-As a sub-project, it builds only the library: the tool and the tests are off. Installed with `cmake --install build`, it is found with `find_package(dngconv REQUIRED)`. In all three cases, LibRaw must be installed, e.g. with `apt install libraw-dev` on Ubuntu.
+As a sub-project, it builds only the library: the tool and the tests are off. Installed with `cmake --install build`, it is found with `find_package(rawconv REQUIRED)`. In all three cases, LibRaw must be installed, e.g. with `apt install libraw-dev` on Ubuntu.
 
 ### Converting from Code
 
 ```cpp
-#include <dngconv/dngconv.hpp>
+#include <rawconv/rawconv.hpp>
 
 // A folder, as the tool does: the raw data as the camera recorded it.
-dngconv::Converter converter;
-for (const auto& result : converter.convert(dngconv::planJobs("in", "out")))
+rawconv::Converter converter;
+for (const auto& result : converter.convert(rawconv::planJobs("in", "out")))
 {
-  if (result.status == dngconv::ConvertResult::Status::FAILED)
+  if (result.status == rawconv::ConvertResult::Status::FAILED)
   {
     std::cerr << result.input << ": " << result.error << '\n';
   }
@@ -201,12 +201,12 @@ for (const auto& result : converter.convert(dngconv::planJobs("in", "out")))
 
 // A file already in memory, e.g. just downloaded from the camera, with its
 // bad pixels repaired.
-dngconv::ConvertOptions options;
-options.bad_pixels = dngconv::BadPixelMode::PER_IMAGE;
-dngconv::Converter repairing(options);
-dngconv::RawImage image = dngconv::readRawBuffer(data, size, "IMG_0001.CR2");
+rawconv::ConvertOptions options;
+options.bad_pixels = rawconv::BadPixelMode::PER_IMAGE;
+rawconv::Converter repairing(options);
+rawconv::RawImage image = rawconv::readRawBuffer(data, size, "IMG_0001.CR2");
 repairing.repair(image);
-dngconv::writeDng(image, "out/IMG_0001.dng");
+rawconv::writeDng(image, "out/IMG_0001.dng");
 ```
 
 `Converter` takes its options and, optionally, the services it works with: the raw decoder, the bad pixel detector, the DNG encoder and the file store. An application can replace any of them, e.g. to read the files from a camera or to write them elsewhere. `Converter::convert` takes a progress callback, and `Converter::cancel()` stops a batch from any thread. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#dependency-injection-and-tests).
@@ -238,14 +238,14 @@ To run the end-to-end tests on our own photos too, put their folder in `docker/.
 
 ```bash
 echo "DNG_USER_SAMPLES=$HOME/Pictures/cr2" > docker/.env
-./docker/dock.sh dng-converter build
+./docker/dock.sh raw-converter build
 ```
 
 The folder is mounted read only at `~/user-samples`, and `test` converts its raw files with the samples. Nothing is written into it.
 
 ## Licence
 
-dng-converter is under the [MIT licence](LICENSE). The third-party software it uses, and why each licence is compatible, is listed in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md). LibRaw is linked dynamically, under the LGPL-2.1. The sample raw files are in the public domain (CC0) and are downloaded, not committed.
+raw-converter is under the [MIT licence](LICENSE). The third-party software it uses, and why each licence is compatible, is listed in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md). LibRaw is linked dynamically, under the LGPL-2.1. The sample raw files are in the public domain (CC0) and are downloaded, not committed.
 
 ## Continuous Integration
 

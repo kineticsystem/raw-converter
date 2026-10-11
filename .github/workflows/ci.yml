@@ -1,6 +1,6 @@
-# Builds and tests the library and dng-convert in the development container,
+# Builds and tests the library and raw-convert in the development container,
 # the image of docker/Dockerfile, so that CI runs with the same packages as
-# `./docker/dock.sh dng-converter exec test.sh` on a developer's machine.
+# `./docker/dock.sh raw-converter exec test.sh` on a developer's machine.
 #
 # The image's layers are kept in the Actions cache, so the image is only
 # rebuilt when the Dockerfile changes. The sample raw files, about 150 MB
@@ -38,12 +38,12 @@ jobs:
         with:
           context: docker
           load: true
-          tags: dng-converter:ci
+          tags: raw-converter:ci
           build-args: |
             USER_UID=${{ steps.user.outputs.uid }}
             USER_GID=${{ steps.user.outputs.gid }}
-          cache-from: type=gha,scope=dng-converter-image
-          cache-to: type=gha,scope=dng-converter-image,mode=max
+          cache-from: type=gha,scope=raw-converter-image
+          cache-to: type=gha,scope=raw-converter-image,mode=max
 
       - uses: actions/cache@v4
         with:
@@ -51,10 +51,10 @@ jobs:
           key: samples-${{ hashFiles('bin/fetch-samples.sh') }}
 
       - name: Download the samples
-        run: docker run --rm -v "$PWD:/home/developer/ws" dng-converter:ci fetch-samples.sh
+        run: docker run --rm -v "$PWD:/home/developer/ws" raw-converter:ci fetch-samples.sh
 
       - name: Build and test
-        run: docker run --rm -v "$PWD:/home/developer/ws" dng-converter:ci test.sh
+        run: docker run --rm -v "$PWD:/home/developer/ws" raw-converter:ci test.sh
 
       - name: Keep the test log
         if: failure()

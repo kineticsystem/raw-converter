@@ -5,7 +5,7 @@
 
 #include "cli_options.hpp"
 
-namespace dngconv::cli
+namespace rawconv::cli
 {
 namespace
 {
@@ -68,4 +68,4 @@ TEST(CommandLine, AutomaticBadPixelMode)
 }
 
 }  // namespace
-}  // namespace dngconv::cli
+}  // namespace rawconv::cli

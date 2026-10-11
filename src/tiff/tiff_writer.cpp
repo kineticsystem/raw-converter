@@ -9,7 +9,7 @@
 #include <stdexcept>
 #include <unordered_map>
 
-namespace dngconv::tiff
+namespace rawconv::tiff
 {
 
 namespace
@@ -328,4 +328,4 @@ std::vector<uint8_t> TiffWriter::write(const Ifd& ifd0)
   return out;
 }
 
-}  // namespace dngconv::tiff
+}  // namespace rawconv::tiff

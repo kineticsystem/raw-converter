@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace dngconv
+namespace rawconv
 {
 
 namespace
@@ -178,4 +178,4 @@ RgbImage renderThumbnail(const RawImage& image, uint32_t max_side)
   return out;
 }
 
-}  // namespace dngconv
+}  // namespace rawconv

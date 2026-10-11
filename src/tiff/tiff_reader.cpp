@@ -7,7 +7,7 @@
 #include <set>
 #include <string>
 
-namespace dngconv::tiff
+namespace rawconv::tiff
 {
 
 namespace
@@ -299,4 +299,4 @@ void copyTiffMetadata(const uint8_t* data, size_t size, Metadata& metadata)
   }
 }
 
-}  // namespace dngconv::tiff
+}  // namespace rawconv::tiff
