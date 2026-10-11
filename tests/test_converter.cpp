@@ -24,10 +24,11 @@ struct Fixture : public ::testing::Test
   std::shared_ptr<MemoryFileStore> files = std::make_shared<MemoryFileStore>();
   std::shared_ptr<FakeDetector> detector = std::make_shared<FakeDetector>();
   std::shared_ptr<CapturingEncoder> encoder = std::make_shared<CapturingEncoder>();
+  std::shared_ptr<CapturingTiffEncoder> tiff_encoder = std::make_shared<CapturingTiffEncoder>();
 
   Converter make(ConvertOptions options)
   {
-    return Converter(options, { std::make_shared<FakeDecoder>(), detector, encoder, files });
+    return Converter(options, { std::make_shared<FakeDecoder>(), detector, encoder, files, tiff_encoder });
   }
 
   // `n` raw files of one camera, named in/0.CR2 ...
@@ -271,6 +272,62 @@ TEST(PlanJobs, MapsFilesAndFolders)
   EXPECT_EQ(jobs[0].output, dir.path() / "single" / "IMG_1.dng");
 
   EXPECT_THROW(planJobs(in / "nope", dir.path()), Error);
+}
+
+TEST_F(Fixture, WritesTheTiffAloneWhenAsked)
+{
+  ConvertOptions options;
+  options.format = OutputFormat::TIFF;
+  options.tiff.color_space = ColorSpace::PROPHOTO;
+  const auto results = make(options).convert(shots(1));
+  ASSERT_EQ(results[0].status, Status::CONVERTED) << results[0].error;
+  EXPECT_EQ(results[0].output, "out/A0.tif");
+  EXPECT_EQ(results[0].outputs, (std::vector<std::filesystem::path>{ "out/A0.tif" }));
+  EXPECT_TRUE(files->exists("out/A0.tif"));
+  EXPECT_FALSE(files->exists("out/A0.dng"));
+  EXPECT_EQ(tiff_encoder->call("A0.CR2").options.color_space, ColorSpace::PROPHOTO);
+}
+
+TEST_F(Fixture, WritesTheDngAndTheTiff)
+{
+  ConvertOptions options;
+  options.format = OutputFormat::DNG_AND_TIFF;
+  options.bad_pixels = BadPixelMode::PER_IMAGE;
+  auto jobs = shots(1);
+  detector->by_file["A0.CR2"] = { { { 5, 5 } }, {} };
+  const auto results = make(options).convert(jobs);
+  ASSERT_EQ(results[0].status, Status::CONVERTED) << results[0].error;
+  EXPECT_EQ(results[0].output, "out/A0.dng");
+  EXPECT_EQ(results[0].outputs, (std::vector<std::filesystem::path>{ "out/A0.dng", "out/A0.tif" }));
+  // Both from the same image, repaired once.
+  EXPECT_EQ(results[0].bad_pixels_fixed, 1u);
+  EXPECT_EQ(tiff_encoder->call("A0.CR2").image.data, encoder->call("A0.CR2").image.data);
+}
+
+TEST_F(Fixture, WritesTheMissingOutputsOnly)
+{
+  ConvertOptions options;
+  options.format = OutputFormat::DNG_AND_TIFF;
+  auto jobs = shots(2);
+  files->put("out/A0.dng", "old");
+  files->put("out/A1.dng", "old");
+  files->put("out/A1.tif", "old");
+  const auto results = make(options).convert(jobs);
+  EXPECT_EQ(results[0].status, Status::CONVERTED);
+  EXPECT_EQ(results[0].outputs, (std::vector<std::filesystem::path>{ "out/A0.tif" }));
+  EXPECT_EQ(files->read("out/A0.dng"), (std::vector<uint8_t>{ 'o', 'l', 'd' }));
+  EXPECT_EQ(results[1].status, Status::SKIPPED);
+  EXPECT_EQ(results[1].outputs, (std::vector<std::filesystem::path>{ "out/A1.dng", "out/A1.tif" }));
+  EXPECT_EQ(tiff_encoder->calls(), 1u);
+}
+
+TEST(OutputPaths, TheTiffIsNamedAsTheDng)
+{
+  const ConvertJob job{ "in/IMG_1.CR2", "out/IMG_1.dng" };
+  EXPECT_EQ(outputPaths(job, OutputFormat::DNG), (std::vector<std::filesystem::path>{ "out/IMG_1.dng" }));
+  EXPECT_EQ(outputPaths(job, OutputFormat::TIFF), (std::vector<std::filesystem::path>{ "out/IMG_1.tif" }));
+  EXPECT_EQ(outputPaths(job, OutputFormat::DNG_AND_TIFF),
+            (std::vector<std::filesystem::path>{ "out/IMG_1.dng", "out/IMG_1.tif" }));
 }
 
 }  // namespace

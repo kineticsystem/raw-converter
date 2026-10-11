@@ -27,6 +27,8 @@ find_package(Threads REQUIRED)
 # converter decodes several files at once.
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBRAW REQUIRED IMPORTED_TARGET libraw_r>=0.20)
+# Little CMS makes the ICC profiles the TIFF files embed.
+pkg_check_modules(LCMS2 REQUIRED IMPORTED_TARGET lcms2)
 
 configure_file(include/rawconv/version.hpp.in ${PROJECT_BINARY_DIR}/include/rawconv/version.hpp @ONLY)
 
@@ -35,12 +37,15 @@ add_library(rawconv
   src/camera_table.cpp
   src/converter.cpp
   src/dng_writer.cpp
+  src/exif.cpp
   src/file_store.cpp
   src/lj92_encoder.cpp
   src/raw_reader.cpp
+  src/renderer.cpp
   src/thumbnail.cpp
   src/tiff/tiff_reader.cpp
-  src/tiff/tiff_writer.cpp)
+  src/tiff/tiff_writer.cpp
+  src/tiff_output.cpp)
 add_library(rawconv::rawconv ALIAS rawconv)
 
 target_compile_features(rawconv PUBLIC cxx_std_17)
@@ -56,8 +61,9 @@ target_include_directories(rawconv
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
   PRIVATE
     ${PROJECT_SOURCE_DIR}/src)
-# LibRaw is an implementation detail: no public header includes it.
-target_link_libraries(rawconv PRIVATE PkgConfig::LIBRAW Threads::Threads)
+# LibRaw and Little CMS are implementation details: no public header includes
+# them.
+target_link_libraries(rawconv PRIVATE PkgConfig::LIBRAW PkgConfig::LCMS2 Threads::Threads)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   target_compile_options(rawconv PRIVATE -Wall -Wextra -Wpedantic)
 endif()

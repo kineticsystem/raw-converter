@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-// raw-convert: converts a raw file, or a folder of them, to DNG.
+// raw-convert: converts a raw file, or a folder of them, to DNG, TIFF or both.
 
 #include <atomic>
 #include <csignal>
@@ -38,7 +38,11 @@ void printResult(const rawconv::ConvertResult& r, size_t done, size_t total, boo
     case Status::CONVERTED:
       if (!quiet)
       {
-        std::cout << counter << r.input.string() << " -> " << r.output.string();
+        std::cout << counter << r.input.string() << " -> ";
+        for (size_t i = 0; i < r.outputs.size(); ++i)
+        {
+          std::cout << (i > 0 ? ", " : "") << r.outputs[i].string();
+        }
         if (r.bad_pixels_fixed > 0)
         {
           std::cout << " (" << r.bad_pixels_fixed << " bad pixel" << (r.bad_pixels_fixed > 1 ? "s" : "") << ")";
@@ -65,6 +69,7 @@ int run(const rawconv::cli::CliOptions& cli)
 {
   rawconv::ConvertOptions options = cli.convert;
   options.dng.software = std::string("raw-converter ") + RAWCONV_VERSION;
+  options.tiff.software = options.dng.software;
 
   const auto jobs = rawconv::planJobs(cli.input, cli.output, cli.recursive);
   if (jobs.empty())

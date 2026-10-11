@@ -201,6 +201,11 @@ bool Ifd::has(uint16_t tag) const
   return entries_.count(tag) != 0;
 }
 
+void Ifd::remove(uint16_t tag)
+{
+  entries_.erase(tag);
+}
+
 std::vector<uint8_t> TiffWriter::write(const Ifd& ifd0)
 {
   // Every directory, depth first, so that a directory comes before its

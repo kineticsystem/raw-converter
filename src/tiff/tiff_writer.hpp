@@ -61,6 +61,7 @@ public:
   void addDataOffsets(uint16_t offsets_tag, uint16_t counts_tag, std::vector<std::vector<uint8_t>> blocks);
 
   bool has(uint16_t tag) const;
+  void remove(uint16_t tag);
 
 private:
   friend class TiffWriter;

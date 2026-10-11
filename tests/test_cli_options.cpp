@@ -20,6 +20,8 @@ TEST(CommandLine, InputAndOutput)
   EXPECT_FALSE(options.recursive);
   EXPECT_EQ(options.convert.dng.compression, Compression::LOSSLESS_JPEG);
   EXPECT_EQ(options.convert.repair, BadPixelRepair::INTERPOLATE);
+  EXPECT_EQ(options.convert.format, OutputFormat::DNG);
+  EXPECT_EQ(options.convert.tiff.color_space, ColorSpace::REC2020);
 }
 
 TEST(CommandLine, Options)
@@ -37,6 +39,20 @@ TEST(CommandLine, Options)
   EXPECT_FALSE(options.convert.dng.embed_preview);
   EXPECT_TRUE(options.convert.overwrite);
   EXPECT_TRUE(options.quiet);
+}
+
+TEST(CommandLine, TiffOptions)
+{
+  EXPECT_EQ(parseCommandLine({ "--format", "tiff", "in", "out" }).convert.format, OutputFormat::TIFF);
+  EXPECT_EQ(parseCommandLine({ "--format", "both", "in", "out" }).convert.format, OutputFormat::DNG_AND_TIFF);
+  EXPECT_EQ(parseCommandLine({ "--format", "dng", "in", "out" }).convert.format, OutputFormat::DNG);
+  EXPECT_EQ(parseCommandLine({ "--colour-space", "prophoto", "in", "out" }).convert.tiff.color_space,
+            ColorSpace::PROPHOTO);
+  EXPECT_EQ(parseCommandLine({ "--colour-space", "srgb", "in", "out" }).convert.tiff.color_space, ColorSpace::SRGB);
+  EXPECT_EQ(parseCommandLine({ "--colour-space", "rec2020", "in", "out" }).convert.tiff.color_space,
+            ColorSpace::REC2020);
+  EXPECT_THROW(parseCommandLine({ "--format", "jpeg", "in", "out" }), std::invalid_argument);
+  EXPECT_THROW(parseCommandLine({ "--colour-space", "adobe", "in", "out" }), std::invalid_argument);
 }
 
 TEST(CommandLine, HelpNeedsNoPaths)

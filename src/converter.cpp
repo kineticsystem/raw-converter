@@ -21,7 +21,9 @@ namespace
 {
 
 // Each file in flight takes some 150 MB (the file, LibRaw's buffers, the
-// image and the encoded DNG): one per core, but no more than this by default.
+// image and the encoded DNG), and some 600 MB with a TIFF (LibRaw's buffers to
+// demosaic, and the rendered image): one per core, but no more than this by
+// default.
 constexpr unsigned MAX_DEFAULT_THREADS = 8;
 
 ConverterServices withDefaults(ConverterServices services, const ConvertOptions& options)
@@ -41,6 +43,10 @@ ConverterServices withDefaults(ConverterServices services, const ConvertOptions&
   if (!services.files)
   {
     services.files = std::make_shared<LocalFileStore>();
+  }
+  if (!services.tiff_encoder)
+  {
+    services.tiff_encoder = std::make_shared<StandardTiffEncoder>();
   }
   return services;
 }
@@ -150,13 +156,31 @@ std::vector<ConvertResult> Converter::convert(const std::vector<ConvertJob>& job
   // Whether a job is settled: skipped, failed in the first pass or
   // cancelled. One element per job, each written by one thread only.
   std::vector<char> settled(jobs.size(), 0);
+  // The files each job is to write: all of them, or those missing.
+  struct Output
+  {
+    std::filesystem::path path;
+    bool tiff = false;
+  };
+  std::vector<std::vector<Output>> to_write(jobs.size());
   ProgressReporter reporter(progress, jobs.size());
   for (size_t i = 0; i < jobs.size(); ++i)
   {
+    const auto paths = outputPaths(jobs[i], options_.format);
     results[i].input = jobs[i].input;
-    results[i].output = jobs[i].output;
-    if (!options_.overwrite && services_.files->exists(jobs[i].output))
+    results[i].output = paths.front();
+    for (size_t k = 0; k < paths.size(); ++k)
     {
+      if (options_.overwrite || !services_.files->exists(paths[k]))
+      {
+        // The DNG comes first, then the TIFF.
+        const bool tiff = options_.format == OutputFormat::TIFF || k == 1;
+        to_write[i].push_back({ paths[k], tiff });
+      }
+    }
+    if (to_write[i].empty())
+    {
+      results[i].outputs = paths;
       results[i].status = ConvertResult::Status::SKIPPED;
       settled[i] = 1;
       reporter.report(results[i]);
@@ -219,7 +243,12 @@ std::vector<ConvertResult> Converter::convert(const std::vector<ConvertJob>& job
         const BadPixelCandidates candidates = found[i] ? *found[i] : services_.detector->detect(image);
         results[i].bad_pixels_fixed = applyRepairs(image, candidates);
       }
-      services_.files->write(jobs[i].output, services_.encoder->encode(image, dng_options));
+      for (const auto& output : to_write[i])
+      {
+        services_.files->write(output.path, output.tiff ? services_.tiff_encoder->encode(image, options_.tiff) :
+                                                          services_.encoder->encode(image, dng_options));
+        results[i].outputs.push_back(output.path);
+      }
       settle(i, ConvertResult::Status::CONVERTED, {});
     }
     catch (const std::exception& e)
@@ -228,6 +257,22 @@ std::vector<ConvertResult> Converter::convert(const std::vector<ConvertJob>& job
     }
   });
   return results;
+}
+
+std::vector<std::filesystem::path> outputPaths(const ConvertJob& job, OutputFormat format)
+{
+  std::filesystem::path tiff = job.output;
+  tiff.replace_extension(".tif");
+  switch (format)
+  {
+    case OutputFormat::DNG:
+      return { job.output };
+    case OutputFormat::TIFF:
+      return { tiff };
+    case OutputFormat::DNG_AND_TIFF:
+      break;
+  }
+  return { job.output, tiff };
 }
 
 std::vector<ConvertJob> planJobs(const std::filesystem::path& input, const std::filesystem::path& output_dir,
