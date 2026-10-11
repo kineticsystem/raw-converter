@@ -28,22 +28,33 @@
 
 ## Introduction
 
-raw-converter is a C++17 library, and a command line tool, that converts camera raw files to DNG files as Adobe DNG Converter does: the same raw data, described with the same values, so that any raw editor that reads DNG renders them as it renders Adobe's. It was written for the Canon EOS 5D Mark II and the Canon EOS 450D (Digital Rebel XSi, Kiss X2), whose CR2 files it is tested on, and converts the raw files of every camera with a Bayer sensor that [LibRaw](https://www.libraw.org) reads.
+raw-converter is a C++17 library, and a command line tool, that converts camera raw files into one of two files, or both:
 
-On request, it also finds hot, stuck and dead pixels, and repairs them in the raw data, so that every raw editor shows them repaired. This is off by default, because Adobe DNG Converter does not do it: its DNGs keep every bad pixel, and only Adobe's own raw editors hide them, when rendering.
+- **DNG**, the raw data, for raw editors. Written as Adobe DNG Converter writes it: the same raw data, described with the same values, so that any raw editor that reads DNG renders it as it renders Adobe's.
+- **TIFF**, the image, for programs that take pixels rather than raw data, e.g. a focus stacker whose result is graded afterwards. Demosaiced, white balanced as shot, linear, 16 bits per sample, in Rec. 2020, ProPhoto RGB or sRGB, with nothing else done to it.
 
-Also on request, it writes TIFF files, instead of the DNG files or besides them: the image demosaiced, white balanced as shot, linear, 16 bits per sample, in Rec. 2020, ProPhoto RGB or sRGB, with nothing else done to it. They are for programs that take an image rather than raw data, e.g. a focus stacker, whose result is graded afterwards.
+On the way, it can find hot, stuck and dead pixels, and repair them in the raw data, so that both files have them repaired. This is off by default, because Adobe DNG Converter does not do it: its DNGs keep every bad pixel, and only Adobe's own raw editors hide them, when rendering.
 
-The tool takes a raw file or a folder of them, and an output folder:
+It was written for the Canon EOS 5D Mark II and the Canon EOS 450D (Digital Rebel XSi, Kiss X2), whose CR2 files it is tested on, and converts the raw files of every camera with a Bayer sensor that [LibRaw](https://www.libraw.org) reads.
+
+The tool takes a raw file or a folder of them, and an output folder. It writes DNG files by default, TIFF files with `--format tiff`, and both with `--format both`:
 
 ```bash
 raw-convert ~/Pictures/2009-09-02 ~/Pictures/2009-09-02/dng
+raw-convert --format tiff --bad-pixels image ~/Pictures/2009-09-02 ~/Pictures/2009-09-02/tiff
 ```
 
 The library does the same from code, so that a bigger application, e.g. one that downloads the pictures from the camera, converts them as they arrive. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how it is built.
 
 ## Features
 
+For both files:
+- **Bad pixels repaired, on request.** With `--bad-pixels`, hot and dead pixels are replaced by the median of their same-colour neighbours, in the raw data, before either file is written. A faint defect is only repaired once photos of *different* scenes by the same camera body show it, so the details of a scene are left alone.
+- **Their metadata.** The original EXIF and GPS data, plus the lens model and the serial number as EXIF 2.3 fields.
+- **Fast.** Several files converted in parallel: about 2.5 seconds for the seven sample files (154 MB of CR2) on a 12-core computer, to DNG. A TIFF takes about 1.2 seconds per 5D Mark II file, on one core.
+- **Open source.** MIT licence, with only MIT-compatible dependencies. No Adobe code.
+
+The DNG:
 - **The raw data, untouched.** The whole frame of the sensor, masked border included, is carried across bit for bit, and compressed with lossless JPEG, as Adobe DNG Converter does. The tests read each DNG back with LibRaw and compare it with the original file, sample by sample.
 - **Described as Adobe describes it.** The DNG says what a raw editor needs, with Adobe's values:
   - the camera's name as Adobe knows it, by which raw editors find their profiles for the camera;
@@ -53,11 +64,13 @@ The library does the same from code, so that a bigger application, e.g. one that
   - the baseline exposure, noise and sharpness.
 
   The tests compare the DNG of a 5D Mark III file with the one Adobe DNG Converter made of it. Ten 5D Mark II files were compared with Adobe's DNGs of them in the same way: the same samples, bit for bit, and the same tags that define the image.
-- **Its metadata.** The original EXIF and GPS data, and the Canon maker note, which ExifTool and photo managers still read, plus the lens model and the serial number as EXIF 2.3 fields.
-- **Bad pixels repaired, on request.** With `--bad-pixels`, hot and dead pixels are replaced by the median of their same-colour neighbours, so that the DNG looks right whatever opens it. A faint defect is only repaired once photos of *different* scenes by the same camera body show it, so the details of a scene are left alone.
-- **Linear TIFF files, on request.** With `--format tiff` or `both`, the image demosaiced by LibRaw, with its bad pixels repaired: the camera's white balance and colour matrix, and no exposure, tone curve, sharpening or noise reduction. 16 bits per sample, with the ICC profile of its colour space and the original's EXIF data.
-- **Fast.** Several files converted in parallel: about 2.5 seconds for the seven sample files (154 MB of CR2) on a 12-core computer.
-- **Open source.** MIT licence, with only MIT-compatible dependencies. No Adobe code.
+- **The Canon maker note**, which ExifTool and photo managers still read.
+- **Repaired for every raw editor.** The repaired pixels replace the bad ones in the raw data, so that the DNG looks right whatever opens it; or, with `--repair opcode`, are listed in a DNG opcode for the raw editors that apply it.
+
+The TIFF:
+- **The image, linear.** Demosaiced by LibRaw (AHD), with the camera's white balance and colour matrix, and no exposure, tone curve, sharpening or noise reduction: twice the light is twice the value.
+- **The camera's crop**, e.g. 5616 × 3744 pixels for the 5D Mark II, as the sensor saw it, with the orientation as a tag.
+- **Its colour space described.** Rec. 2020 by default, or ProPhoto RGB or sRGB, with its ICC profile embedded. 16 bits per sample, uncompressed.
 
 ## Prerequisites
 
@@ -117,7 +130,7 @@ The tool is then `build/apps/raw-convert/raw-convert`, which is on the `PATH` in
 raw-convert [options] <raw file or folder> <output folder>
 ```
 
-Each DNG is named after its raw file, e.g. `IMG_1069.CR2` becomes `IMG_1069.dng`, and each TIFF too, with `.tif`. A file that already exists is not written again, unless `--overwrite` is given, and a raw file whose files all exist is skipped. For example, in the container:
+Each file is named after its raw file, e.g. `IMG_1069.CR2` becomes `IMG_1069.dng` and `IMG_1069.tif`. A file that already exists is not written again, unless `--overwrite` is given, and a raw file whose files all exist is skipped. For example, in the container:
 
 ```bash
 samples

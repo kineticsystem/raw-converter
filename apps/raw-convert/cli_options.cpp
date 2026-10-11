@@ -37,9 +37,12 @@ std::string usage()
   return R"(Usage: raw-convert [options] <raw file or folder> <output folder>
 
 Converts camera raw files (Canon CR2 and the other formats LibRaw reads) to
-DNG files as Adobe DNG Converter does: the raw data as the camera recorded
-it, with the same description. Optionally, repairs hot and dead pixels, and
-writes TIFF files: the image demosaiced, linear, 16 bits per sample.
+DNG files, TIFF files or both:
+  DNG   the raw data as the camera recorded it, described as Adobe DNG
+        Converter describes it, for raw editors;
+  TIFF  the image demosaiced, linear, 16 bits per sample, with its ICC
+        profile, for programs that take pixels.
+Optionally, repairs hot and dead pixels in both.
 
 Options:
   --format FORMAT         The files to write for each raw file:
