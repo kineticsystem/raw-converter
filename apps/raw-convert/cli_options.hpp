@@ -8,9 +8,9 @@
 #include <string>
 #include <vector>
 
-#include "dngconv/converter.hpp"
+#include "rawconv/converter.hpp"
 
-namespace dngconv::cli
+namespace rawconv::cli
 {
 
 // What the command line asks for.
@@ -38,4 +38,4 @@ std::string usage();
 // The bad pixel mode for an automatic choice, given the files to convert.
 BadPixelMode autoBadPixelMode(size_t files);
 
-}  // namespace dngconv::cli
+}  // namespace rawconv::cli

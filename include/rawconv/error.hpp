@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace dngconv
+namespace rawconv
 {
 
 // Thrown by the library when a file cannot be read, decoded or written.
@@ -18,4 +18,4 @@ public:
   }
 };
 
-}  // namespace dngconv
+}  // namespace rawconv

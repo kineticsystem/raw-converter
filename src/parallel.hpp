@@ -11,7 +11,7 @@
 #include <thread>
 #include <vector>
 
-namespace dngconv
+namespace rawconv
 {
 
 // Calls fn(i) for i in [0, count), on up to `threads` threads; 0 means one per
@@ -82,4 +82,4 @@ void parallelFor(size_t count, unsigned threads, Fn&& fn)
   }
 }
 
-}  // namespace dngconv
+}  // namespace rawconv

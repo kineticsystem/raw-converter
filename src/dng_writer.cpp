@@ -1,19 +1,19 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-#include "dngconv/dng_writer.hpp"
+#include "rawconv/dng_writer.hpp"
 
 #include <algorithm>
 #include <cmath>
 
-#include "dngconv/error.hpp"
-#include "dngconv/file_store.hpp"
+#include "rawconv/error.hpp"
+#include "rawconv/file_store.hpp"
 #include "lj92_encoder.hpp"
 #include "parallel.hpp"
 #include "thumbnail.hpp"
 #include "tiff/tiff_writer.hpp"
 
-namespace dngconv
+namespace rawconv
 {
 
 namespace
@@ -702,4 +702,4 @@ void writeDng(const RawImage& image, const std::filesystem::path& path, const Dn
   LocalFileStore().write(path, encodeDng(image, options));
 }
 
-}  // namespace dngconv
+}  // namespace rawconv

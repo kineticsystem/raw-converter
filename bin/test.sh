@@ -11,6 +11,6 @@ if [ -d ~/user-samples ]; then
   dirs="$dirs:$HOME/user-samples"
 fi
 
-cmake -S . -B build -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DDNGCONV_SAMPLE_DIRS="$dirs" "$@"
+cmake -S . -B build -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DRAWCONV_SAMPLE_DIRS="$dirs" "$@"
 cmake --build build
 ctest --test-dir build --output-on-failure

@@ -15,7 +15,7 @@
 #include <string>
 #include <vector>
 
-namespace dngconv::test
+namespace rawconv::test
 {
 
 struct Decoded
@@ -123,4 +123,4 @@ inline Frame readFrame(const std::vector<uint8_t>& file)
   return out;
 }
 
-}  // namespace dngconv::test
+}  // namespace rawconv::test

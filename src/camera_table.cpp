@@ -1,9 +1,9 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-#include "dngconv/camera_table.hpp"
+#include "rawconv/camera_table.hpp"
 
-namespace dngconv
+namespace rawconv
 {
 
 namespace
@@ -52,4 +52,4 @@ const CameraTraits* CameraTable::find(const std::string& unique_camera_model) co
   return it == traits_.end() ? nullptr : &it->second;
 }
 
-}  // namespace dngconv
+}  // namespace rawconv

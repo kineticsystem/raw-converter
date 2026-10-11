@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-namespace dngconv::tiff
+namespace rawconv::tiff
 {
 
 // The TIFF field types used in DNG.
@@ -85,4 +85,4 @@ public:
   static std::vector<uint8_t> write(const Ifd& ifd0);
 };
 
-}  // namespace dngconv::tiff
+}  // namespace rawconv::tiff

@@ -8,9 +8,9 @@
 #include <optional>
 #include <vector>
 
-#include "dngconv/raw_image.hpp"
+#include "rawconv/raw_image.hpp"
 
-namespace dngconv::tiff
+namespace rawconv::tiff
 {
 
 // A read-only view of a TIFF structured file -- CR2, NEF, ARW, DNG, ... --
@@ -72,4 +72,4 @@ private:
 // file is not TIFF based (e.g. CR3, RAF).
 void copyTiffMetadata(const uint8_t* data, size_t size, Metadata& metadata);
 
-}  // namespace dngconv::tiff
+}  // namespace rawconv::tiff

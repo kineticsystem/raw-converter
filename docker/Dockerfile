@@ -1,10 +1,10 @@
-# Ubuntu 24.04 with the tools to build and test dng-converter, for user
+# Ubuntu 24.04 with the tools to build and test raw-converter, for user
 # "developer". Nothing is installed on the host: the repo is bind-mounted at
 # ~/ws (see docker-compose.yml) and built from there.
 
 FROM ubuntu:24.04
 
-LABEL name="develop:dng-converter"
+LABEL name="develop:raw-converter"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -63,7 +63,7 @@ ENV HOME=/home/developer
 # the bashrc means it also applies to non-interactive shells, e.g.
 # `docker exec <container-name> build.sh`. The converter itself is in
 # build/apps.
-ENV PATH="/home/developer/ws/bin:/home/developer/ws/build/apps/dng-convert:/home/developer/.local/bin:${PATH}"
+ENV PATH="/home/developer/ws/bin:/home/developer/ws/build/apps/raw-convert:/home/developer/.local/bin:${PATH}"
 
 # Whatever genuinely needs an interactive shell -- the aliases -- lives in this
 # file, which is versioned in the repo instead of being echoed line by line

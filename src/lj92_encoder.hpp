@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace dngconv
+namespace rawconv
 {
 
 // Encodes 16-bit samples as a lossless JPEG (ITU T.81, process 14, predictor
@@ -23,4 +23,4 @@ namespace dngconv
 // as this predictor allows.
 std::vector<uint8_t> encodeLosslessJpeg(const uint16_t* samples, uint32_t width, uint32_t height, uint32_t components);
 
-}  // namespace dngconv
+}  // namespace rawconv

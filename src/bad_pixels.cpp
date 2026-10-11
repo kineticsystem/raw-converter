@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-#include "dngconv/bad_pixels.hpp"
+#include "rawconv/bad_pixels.hpp"
 
 #include <algorithm>
 #include <array>
@@ -11,9 +11,9 @@
 #include <set>
 #include <sstream>
 
-#include "dngconv/error.hpp"
+#include "rawconv/error.hpp"
 
-namespace dngconv
+namespace rawconv
 {
 
 namespace
@@ -491,7 +491,7 @@ void DefectMap::read(std::istream& in)
 void DefectMap::write(std::ostream& out, unsigned min_scenes, double min_fraction) const
 {
   std::lock_guard<std::mutex> lock(mutex_);
-  out << "# dng-converter defect map: the sensor defects of each camera, as <row> <col>\n"
+  out << "# raw-converter defect map: the sensor defects of each camera, as <row> <col>\n"
       << "# in raw image coordinates. Edit freely; reading adds to what is known.\n";
   for (const auto& [key, camera] : cameras_)
   {
@@ -508,4 +508,4 @@ void DefectMap::write(std::ostream& out, unsigned min_scenes, double min_fractio
   }
 }
 
-}  // namespace dngconv
+}  // namespace rawconv

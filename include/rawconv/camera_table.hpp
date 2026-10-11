@@ -9,21 +9,21 @@
 #include <optional>
 #include <string>
 
-namespace dngconv
+namespace rawconv
 {
 
 // What a DNG says about a camera model that is not in its raw files: values
-// Adobe DNG Converter writes from its own camera table, and raw converters use
+// Adobe DNG Converter writes from its own camera table, and raw editors use
 // when rendering. Each is optional: what is not known is left out of the DNG,
 // which then holds the DNG default.
 struct CameraTraits
 {
-  // Exposure, in stops, a raw converter adds to an unedited photo. Leaving it out
+  // Exposure, in stops, a raw editor adds to an unedited photo. Leaving it out
   // makes the photo open darker than Adobe's DNG of the same raw file: by
   // 0.25 EV for the Canon EOS 5D Mark III.
   std::optional<double> baseline_exposure;
   // The camera's noise and sharpness relative to a reference camera, which
-  // scale a raw converter's default noise reduction and sharpening.
+  // scale a raw editor's default noise reduction and sharpening.
   std::optional<double> baseline_noise;
   std::optional<double> baseline_sharpness;
   // How much the two greens of the Bayer pattern differ, 0 to 5000, which
@@ -57,4 +57,4 @@ private:
   std::map<std::string, CameraTraits> traits_;
 };
 
-}  // namespace dngconv
+}  // namespace rawconv

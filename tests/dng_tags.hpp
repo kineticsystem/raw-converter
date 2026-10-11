@@ -12,7 +12,7 @@
 #include "tiff/tiff_reader.hpp"
 #include "tiff/tiff_writer.hpp"
 
-namespace dngconv::test
+namespace rawconv::test
 {
 
 class DngTags
@@ -92,4 +92,4 @@ private:
   const std::vector<uint8_t>& bytes_;
 };
 
-}  // namespace dngconv::test
+}  // namespace rawconv::test

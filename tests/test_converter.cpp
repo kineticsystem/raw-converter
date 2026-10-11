@@ -9,10 +9,10 @@
 #include <fstream>
 #include <set>
 
-#include "dngconv/converter.hpp"
+#include "rawconv/converter.hpp"
 #include "test_support.hpp"
 
-namespace dngconv::test
+namespace rawconv::test
 {
 namespace
 {
@@ -274,4 +274,4 @@ TEST(PlanJobs, MapsFilesAndFolders)
 }
 
 }  // namespace
-}  // namespace dngconv::test
+}  // namespace rawconv::test

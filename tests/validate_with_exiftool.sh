@@ -1,10 +1,10 @@
 #!/bin/bash -e
 
-# Converts the raw files of each sample folder with dng-convert and checks
+# Converts the raw files of each sample folder with raw-convert and checks
 # every DNG with exiftool's validator, which reports TIFF structure problems
 # and missing or malformed DNG tags.
 #
-# Usage: validate_with_exiftool.sh <dng-convert> <exiftool> <work folder> <folders, colon separated>
+# Usage: validate_with_exiftool.sh <raw-convert> <exiftool> <work folder> <folders, colon separated>
 
 convert="$1"
 exiftool="$2"

@@ -2,16 +2,16 @@
 // SPDX-License-Identifier: MIT
 
 // End to end, on real raw files: those of bin/fetch-samples.sh, and any other
-// folder listed in DNGCONV_SAMPLE_DIRS. Skipped when there are none.
+// folder listed in RAWCONV_SAMPLE_DIRS. Skipped when there are none.
 
 #include <gtest/gtest.h>
 
-#include "dngconv/dngconv.hpp"
+#include "rawconv/rawconv.hpp"
 #include "libraw_readback.hpp"
 #include "test_support.hpp"
 #include "tiff/tiff_reader.hpp"
 
-namespace dngconv::test
+namespace rawconv::test
 {
 namespace
 {
@@ -67,7 +67,7 @@ TEST_P(Samples, ConvertsLosslessly)
     EXPECT_NEAR(dng.neutral_mul[c], original.neutral_mul[c], 1e-3);
   }
 
-  // Raw converters find their camera profiles by UniqueCameraModel, and knows each
+  // Raw editors find their camera profiles by UniqueCameraModel, and knows each
   // camera by one name only, whatever the market it was sold in.
   const std::string model = uniqueCameraModel(dng_bytes);
   const std::string name = input.filename().string();
@@ -165,4 +165,4 @@ INSTANTIATE_TEST_SUITE_P(RawFiles, Samples, ::testing::ValuesIn(sampleFiles()), 
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(Samples);
 
 }  // namespace
-}  // namespace dngconv::test
+}  // namespace rawconv::test

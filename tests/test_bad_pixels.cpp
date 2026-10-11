@@ -7,10 +7,10 @@
 #include <cmath>
 #include <sstream>
 
-#include "dngconv/bad_pixels.hpp"
+#include "rawconv/bad_pixels.hpp"
 #include "test_support.hpp"
 
-namespace dngconv::test
+namespace rawconv::test
 {
 namespace
 {
@@ -218,4 +218,4 @@ TEST(DefectMap, CameraKeyTellsBodiesApart)
 }
 
 }  // namespace
-}  // namespace dngconv::test
+}  // namespace rawconv::test

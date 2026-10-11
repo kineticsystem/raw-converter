@@ -6,7 +6,7 @@
 #include <array>
 #include <stdexcept>
 
-namespace dngconv
+namespace rawconv
 {
 
 namespace
@@ -328,4 +328,4 @@ std::vector<uint8_t> encodeLosslessJpeg(const uint16_t* samples, uint32_t width,
   return out;
 }
 
-}  // namespace dngconv
+}  // namespace rawconv

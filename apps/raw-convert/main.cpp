@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-// dng-convert: converts a raw file, or a folder of them, to DNG.
+// raw-convert: converts a raw file, or a folder of them, to DNG.
 
 #include <atomic>
 #include <csignal>
@@ -11,7 +11,7 @@
 #include <vector>
 
 #include "cli_options.hpp"
-#include "dngconv/dngconv.hpp"
+#include "rawconv/rawconv.hpp"
 
 namespace
 {
@@ -19,20 +19,20 @@ namespace
 // The converter Ctrl-C cancels: the files being converted are finished, the
 // others are not started. Converter::cancel() only stores to a lock-free
 // atomic, which a signal handler may do.
-std::atomic<dngconv::Converter*> running{ nullptr };
+std::atomic<rawconv::Converter*> running{ nullptr };
 
 void onInterrupt(int)
 {
-  if (dngconv::Converter* converter = running.load())
+  if (rawconv::Converter* converter = running.load())
   {
     converter->cancel();
   }
 }
 
-void printResult(const dngconv::ConvertResult& r, size_t done, size_t total, bool quiet)
+void printResult(const rawconv::ConvertResult& r, size_t done, size_t total, bool quiet)
 {
   const std::string counter = "[" + std::to_string(done) + "/" + std::to_string(total) + "] ";
-  using Status = dngconv::ConvertResult::Status;
+  using Status = rawconv::ConvertResult::Status;
   switch (r.status)
   {
     case Status::CONVERTED:
@@ -61,12 +61,12 @@ void printResult(const dngconv::ConvertResult& r, size_t done, size_t total, boo
   }
 }
 
-int run(const dngconv::cli::CliOptions& cli)
+int run(const rawconv::cli::CliOptions& cli)
 {
-  dngconv::ConvertOptions options = cli.convert;
-  options.dng.software = std::string("dng-converter ") + DNGCONV_VERSION;
+  rawconv::ConvertOptions options = cli.convert;
+  options.dng.software = std::string("raw-converter ") + RAWCONV_VERSION;
 
-  const auto jobs = dngconv::planJobs(cli.input, cli.output, cli.recursive);
+  const auto jobs = rawconv::planJobs(cli.input, cli.output, cli.recursive);
   if (jobs.empty())
   {
     std::cerr << "No raw files in " << cli.input.string() << '\n';
@@ -74,23 +74,23 @@ int run(const dngconv::cli::CliOptions& cli)
   }
   if (cli.auto_bad_pixel_mode)
   {
-    options.bad_pixels = dngconv::cli::autoBadPixelMode(jobs.size());
+    options.bad_pixels = rawconv::cli::autoBadPixelMode(jobs.size());
   }
 
-  dngconv::Converter converter(options);
+  rawconv::Converter converter(options);
   if (cli.defect_map && std::filesystem::exists(*cli.defect_map))
   {
     std::ifstream in(*cli.defect_map);
     if (!in)
     {
-      throw dngconv::Error(cli.defect_map->string() + ": cannot open");
+      throw rawconv::Error(cli.defect_map->string() + ": cannot open");
     }
     converter.defectMap().read(in);
   }
 
   running = &converter;
   std::signal(SIGINT, onInterrupt);
-  const auto results = converter.convert(jobs, [&](const dngconv::ConvertResult& r, size_t done, size_t total) {
+  const auto results = converter.convert(jobs, [&](const rawconv::ConvertResult& r, size_t done, size_t total) {
     printResult(r, done, total, cli.quiet);
   });
   std::signal(SIGINT, SIG_DFL);
@@ -102,7 +102,7 @@ int run(const dngconv::cli::CliOptions& cli)
     converter.defectMap().write(out, options.batch_min_scenes, options.batch_min_fraction);
     if (!out)
     {
-      throw dngconv::Error(cli.defect_map->string() + ": cannot write");
+      throw rawconv::Error(cli.defect_map->string() + ": cannot write");
     }
   }
 
@@ -111,7 +111,7 @@ int run(const dngconv::cli::CliOptions& cli)
   {
     ++counts[static_cast<int>(r.status)];
   }
-  using Status = dngconv::ConvertResult::Status;
+  using Status = rawconv::ConvertResult::Status;
   if (!cli.quiet)
   {
     std::cout << counts[static_cast<int>(Status::CONVERTED)] << " converted, "
@@ -134,24 +134,24 @@ int run(const dngconv::cli::CliOptions& cli)
 
 int main(int argc, char** argv)
 {
-  dngconv::cli::CliOptions cli;
+  rawconv::cli::CliOptions cli;
   try
   {
-    cli = dngconv::cli::parseCommandLine(std::vector<std::string>(argv + 1, argv + argc));
+    cli = rawconv::cli::parseCommandLine(std::vector<std::string>(argv + 1, argv + argc));
   }
   catch (const std::invalid_argument& e)
   {
-    std::cerr << "dng-convert: " << e.what() << "\n\n" << dngconv::cli::usage();
+    std::cerr << "raw-convert: " << e.what() << "\n\n" << rawconv::cli::usage();
     return 2;
   }
   if (cli.help)
   {
-    std::cout << dngconv::cli::usage();
+    std::cout << rawconv::cli::usage();
     return 0;
   }
   if (cli.version)
   {
-    std::cout << "dng-convert " << DNGCONV_VERSION << " (LibRaw " << dngconv::librawVersion() << ")\n";
+    std::cout << "raw-convert " << RAWCONV_VERSION << " (LibRaw " << rawconv::librawVersion() << ")\n";
     return 0;
   }
   try
@@ -160,7 +160,7 @@ int main(int argc, char** argv)
   }
   catch (const std::exception& e)
   {
-    std::cerr << "dng-convert: " << e.what() << '\n';
+    std::cerr << "raw-convert: " << e.what() << '\n';
     return 1;
   }
 }

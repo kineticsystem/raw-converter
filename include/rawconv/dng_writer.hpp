@@ -8,9 +8,9 @@
 #include <string>
 #include <vector>
 
-#include "dngconv/raw_image.hpp"
+#include "rawconv/raw_image.hpp"
 
-namespace dngconv
+namespace rawconv
 {
 
 enum class Compression
@@ -30,7 +30,7 @@ struct DngWriteOptions
   bool embed_preview = true;
 
   // The DNG Software tag.
-  std::string software = "dng-converter";
+  std::string software = "raw-converter";
 
   // Threads compressing the tiles of one file. Leave at 1 when converting
   // several files in parallel already.
@@ -63,7 +63,7 @@ public:
 };
 
 // Encodes the image and writes it to `path`, replacing an existing file only
-// once the new one is complete. Throws dngconv::Error on failure.
+// once the new one is complete. Throws rawconv::Error on failure.
 void writeDng(const RawImage& image, const std::filesystem::path& path, const DngWriteOptions& options = {});
 
-}  // namespace dngconv
+}  // namespace rawconv

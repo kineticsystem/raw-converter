@@ -5,14 +5,14 @@
 
 #include <tuple>
 
-#include "dngconv/dng_writer.hpp"
+#include "rawconv/dng_writer.hpp"
 #include "dng_tags.hpp"
 #include "libraw_readback.hpp"
 #include "test_support.hpp"
 #include "tiff/tiff_reader.hpp"
 #include "tiff/tiff_writer.hpp"
 
-namespace dngconv::test
+namespace rawconv::test
 {
 namespace
 {
@@ -70,7 +70,7 @@ TEST(DngWriter, SmoothImageCompressesWell)
   EXPECT_LT(compressed.size() * 2, uncompressed.size());
 }
 
-TEST(DngWriter, WritesTheTagsRawConvertersNeed)
+TEST(DngWriter, WritesTheTagsRawEditorsNeed)
 {
   RawImage image = makeCfaImage(300, 200);
   image.black_level = { 1023, 1024, 1025, 1026 };
@@ -271,4 +271,4 @@ TEST(DngWriter, WriteDngReplacesAtomically)
 }
 
 }  // namespace
-}  // namespace dngconv::test
+}  // namespace rawconv::test

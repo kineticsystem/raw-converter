@@ -10,10 +10,10 @@
 #include <string>
 #include <vector>
 
-#include "dngconv/camera_table.hpp"
-#include "dngconv/raw_image.hpp"
+#include "rawconv/camera_table.hpp"
+#include "rawconv/raw_image.hpp"
 
-namespace dngconv
+namespace rawconv
 {
 
 // Turns the bytes of a camera raw file into a RawImage. The seam between the
@@ -23,7 +23,7 @@ class RawDecoder
 {
 public:
   virtual ~RawDecoder() = default;
-  // Throws dngconv::Error when the data cannot be decoded. Must be safe to call
+  // Throws rawconv::Error when the data cannot be decoded. Must be safe to call
   // from several threads at once.
   virtual RawImage decode(const uint8_t* data, size_t size, const std::string& file_name) const = 0;
 };
@@ -45,7 +45,7 @@ private:
   std::shared_ptr<const CameraTable> cameras_;
 };
 
-// Decodes a camera raw file with LibRawDecoder. Throws dngconv::Error when the
+// Decodes a camera raw file with LibRawDecoder. Throws rawconv::Error when the
 // file cannot be read or decoded.
 RawImage readRawFile(const std::filesystem::path& path);
 
@@ -61,4 +61,4 @@ bool isRawFileName(const std::filesystem::path& path);
 // The LibRaw version the library was built with.
 std::string librawVersion();
 
-}  // namespace dngconv
+}  // namespace rawconv

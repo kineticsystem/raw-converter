@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Giovanni Remigi
 // SPDX-License-Identifier: MIT
 
-#include "dngconv/raw_reader.hpp"
+#include "rawconv/raw_reader.hpp"
 
 #include <libraw/libraw.h>
 
@@ -13,11 +13,11 @@
 #include <regex>
 #include <set>
 
-#include "dngconv/error.hpp"
-#include "dngconv/file_store.hpp"
+#include "rawconv/error.hpp"
+#include "rawconv/file_store.hpp"
 #include "tiff/tiff_reader.hpp"
 
-namespace dngconv
+namespace rawconv
 {
 
 namespace
@@ -106,7 +106,7 @@ void readMetadata(const LibRaw& raw, Metadata& metadata)
   metadata.make = trim(d.idata.make);
   const std::string model = trim(d.idata.model);
   metadata.model = model.rfind(metadata.make, 0) == 0 ? model : metadata.make + " " + model;
-  // Adobe's name for the camera, by which raw converters find their profiles
+  // Adobe's name for the camera, by which raw editors find their profiles
   // for it.
   // LibRaw gives every regional name of a camera the same normalised name,
   // e.g. "EOS 450D" for the Digital Rebel XSi and the Kiss X2.
@@ -451,4 +451,4 @@ std::string librawVersion()
   return LibRaw::version();
 }
 
-}  // namespace dngconv
+}  // namespace rawconv

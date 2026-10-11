@@ -12,9 +12,9 @@
 #include <string>
 #include <vector>
 
-#include "dngconv/raw_image.hpp"
+#include "rawconv/raw_image.hpp"
 
-namespace dngconv
+namespace rawconv
 {
 
 // Thresholds of the bad pixel detector. A pixel is compared with the nearest
@@ -124,7 +124,7 @@ public:
 
   // Plain text: one "camera <key>" line per camera, followed by one
   // "<row> <col>" line per confirmed defect. Lines starting with # are
-  // comments. Reading adds to what the map holds. Throws dngconv::Error on a
+  // comments. Reading adds to what the map holds. Throws rawconv::Error on a
   // malformed line.
   void read(std::istream& in);
   void write(std::ostream& out, unsigned min_scenes = 2, double min_fraction = 0.25) const;
@@ -144,4 +144,4 @@ private:
   std::map<std::string, Camera> cameras_;
 };
 
-}  // namespace dngconv
+}  // namespace rawconv

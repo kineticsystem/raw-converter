@@ -11,12 +11,12 @@
 #include <string>
 #include <vector>
 
-#include "dngconv/bad_pixels.hpp"
-#include "dngconv/dng_writer.hpp"
-#include "dngconv/file_store.hpp"
-#include "dngconv/raw_reader.hpp"
+#include "rawconv/bad_pixels.hpp"
+#include "rawconv/dng_writer.hpp"
+#include "rawconv/file_store.hpp"
+#include "rawconv/raw_reader.hpp"
 
-namespace dngconv
+namespace rawconv
 {
 
 enum class BadPixelMode
@@ -32,11 +32,11 @@ enum class BadPixelMode
 
 enum class BadPixelRepair
 {
-  // Replace the values in the raw data, which every raw converter then shows
+  // Replace the values in the raw data, which every raw editor then shows
   // repaired.
   INTERPOLATE,
   // Keep the original values and add a DNG FixBadPixelsList opcode, which a
-  // raw converter that supports DNG opcodes applies when rendering; one that
+  // raw editor that supports DNG opcodes applies when rendering; one that
   // does not shows the pixels unrepaired.
   OPCODE,
 };
@@ -159,8 +159,8 @@ private:
 // sub-folders of `input` are searched too, and mirrored in `output_dir`. Raw
 // files that would share a DNG name (IMG_1.CR2 and IMG_1.CR3) get their
 // extension added to it (IMG_1.dng and IMG_1_CR3.dng).
-// Throws dngconv::Error when `input` does not exist.
+// Throws rawconv::Error when `input` does not exist.
 std::vector<ConvertJob> planJobs(const std::filesystem::path& input, const std::filesystem::path& output_dir,
                                  bool recursive = false);
 
-}  // namespace dngconv
+}  // namespace rawconv

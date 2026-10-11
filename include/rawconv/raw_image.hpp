@@ -9,9 +9,9 @@
 #include <string>
 #include <vector>
 
-#include "dngconv/camera_table.hpp"
+#include "rawconv/camera_table.hpp"
 
-namespace dngconv
+namespace rawconv
 {
 
 // How the samples of a raw image are arranged.
@@ -99,7 +99,7 @@ struct Metadata
 };
 
 // A decoded raw image, ready to be written as DNG: the sensor data, unchanged,
-// plus what a raw converter needs to render it.
+// plus what a raw editor needs to render it.
 struct RawImage
 {
   RawLayout layout = RawLayout::CFA;
@@ -141,7 +141,7 @@ struct RawImage
 
   Metadata metadata;
 
-  // Bad pixels the raw converter should repair when rendering, written as a
+  // Bad pixels the raw editor should repair when rendering, written as a
   // DNG FixBadPixelsList opcode: the values in `data` stay as they are.
   std::vector<PixelPos> opcode_bad_pixels;
 
@@ -180,4 +180,4 @@ struct RawImage
   }
 };
 
-}  // namespace dngconv
+}  // namespace rawconv
