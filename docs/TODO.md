@@ -10,7 +10,7 @@ Where we are, what is needed from Giovanni, and what comes next. Last updated 20
 - With the default settings, our DNGs of the ten 5D Mark II files hold the same samples as Adobe's, bit for bit, over the whole frame of the sensor, with the same `ActiveArea`, CFA pattern, crop, orientation and camera traits.
 - Adobe DNG Converter repairs no bad pixel: its DNGs hold the CR2's samples, with no opcode. Neither do we, by default. `--bad-pixels image`, `batch` or `auto` repairs them in the raw data, and changes no other sample; `--repair opcode` keeps the raw data and adds an opcode instead.
 - `--format tiff` or `both` also writes a TIFF: the image demosaiced by LibRaw, with the bad pixels repaired, linear, 16 bits per sample, in Rec. 2020 (default), ProPhoto RGB or sRGB, with its ICC profile. It is for StepIt Stacker's develop step, in place of darktable.
-- The code is on GitHub, in the private repository [kineticsystem/raw-converter](https://github.com/kineticsystem/raw-converter), branch `main`.
+- The code is on GitHub, in the public repository [kineticsystem/raw-converter](https://github.com/kineticsystem/raw-converter), branch `main`.
 
 ## Needed from Giovanni
 
@@ -26,7 +26,7 @@ Where we are, what is needed from Giovanni, and what comes next. Last updated 20
 
   Note anything that differs.
 - [ ] **Can the ten 5D Mark II pairs be kept?** They are about 450 MB, too much for the repository. If they may be published, e.g. on raw.pixls.us, `test_adobe_reference` can check them on every run, as it checks the 5D Mark III's. Otherwise, `tmp` stays out of Git and the comparison stays by hand.
-- [x] **The GitHub repository**: [kineticsystem/raw-converter](https://github.com/kineticsystem/raw-converter), private.
+- [x] **The GitHub repository**: [kineticsystem/raw-converter](https://github.com/kineticsystem/raw-converter), public.
 - [ ] Should `TODO.md` stay in the repo, or be ignored like `task.md` in the StepIt repos?
 - [ ] **Any 450D raw files of your own**, if you have some, for the tests.
 
