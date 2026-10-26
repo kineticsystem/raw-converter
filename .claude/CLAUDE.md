@@ -37,7 +37,12 @@ For the `architect` and `reviewer` skills: what they cannot find out alone.
 - `docs/ARCHITECTURE.md` follows the two halves above: a DNG that matches Adobe's, and a TIFF that adds nothing. Its sections, in order: Introduction, The Big Picture, The Modules (`| Path | Role | Depends on |`), The Classes, SOLID and Where It Stops, Dependency Injection and Tests, The DNG File, Lossless JPEG, The TIFF File, Bad Pixels, Threads, Compared with Adobe DNG Converter (one subsection per camera body measured), The Container, Tests, How to Extend the Converter, Design Decisions and Trade-offs, Known Limitations.
 - The review goes in `docs/Review.md`, the skill's default. Known Limitations and the LibRaw reader's quirks noted under Tests are documented: judge them, do not report them as bugs.
 - Includes to count: LibRaw (`#include <libraw`) and Little CMS (`#include <lcms2`), which must stay in the files above; and the public headers of `include/rawconv/`, which must not name either.
+- **Diagrams** follow the `beautiful-mermaid-diagrams` skill, not the blue style of `write-docs`: colours by role, compact, readable in light and dark mode. Each is shown as an image: its source is `docs/diagrams/<name>.mmd`, rendered by `bin/render-diagrams.sh` into an SVG beside it, outside the container (it needs Node.js and Chrome); commit both. `bin/check-diagrams.sh`, run by `bin/test.sh` and by `ci-format.yml`, fails when an SVG is older than its source.
 - **Probes**: a throwaway test is a GoogleTest file in `tests/`, added to `tests/CMakeLists.txt`, built and run with `ctest --test-dir build -R <test> --output-on-failure`, in the container. A DNG is checked against `exiftool -validate`, as `tests/validate_with_exiftool.sh` does.
+
+## Pull Request Notes
+
+Each pull request has a notes file in [docs/pr/](../docs/pr/README.md): what we discussed, what we chose, and why. One file per pull request, written while the branch is open. Keep them simple: short sentences, one idea per paragraph, and a diagram when it explains faster than words.
 
 ## Conventions
 
