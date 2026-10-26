@@ -2,7 +2,7 @@
 
 # Build, then run the tests: the unit tests and, on the raw files of
 # ./samples (see fetch-samples.sh) and of ~/user-samples when it holds any,
-# the end-to-end tests.
+# the end-to-end tests. Last, that every diagram is rendered from its source.
 
 cd "$(dirname "$(readlink -f "$0")")/.."
 
@@ -14,3 +14,4 @@ fi
 cmake -S . -B build -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DRAWCONV_SAMPLE_DIRS="$dirs" "$@"
 cmake --build build
 ctest --test-dir build --output-on-failure
+bin/check-diagrams.sh

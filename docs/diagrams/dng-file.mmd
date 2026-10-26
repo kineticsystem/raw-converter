@@ -1,0 +1,79 @@
+---
+config:
+  theme: base
+  fontFamily: "Arial, Helvetica, sans-serif"
+  flowchart:
+    curve: basis
+    padding: 12
+    nodeSpacing: 46
+    rankSpacing: 32
+    wrappingWidth: 300
+    subGraphTitleMargin:
+      top: 4
+      bottom: 10
+  class:
+    padding: 10
+  themeVariables:
+    lineColor: "#94a3b8"
+    textColor: "#64748b"
+    primaryColor: "#f1f5f9"
+    primaryBorderColor: "#64748b"
+    primaryTextColor: "#0f172a"
+    secondaryColor: "#f1f5f9"
+    secondaryBorderColor: "#64748b"
+    secondaryTextColor: "#0f172a"
+    tertiaryColor: "#f1f5f9"
+    tertiaryBorderColor: "#64748b"
+    tertiaryTextColor: "#0f172a"
+    mainBkg: "#f1f5f9"
+    nodeBorder: "#64748b"
+    nodeTextColor: "#0f172a"
+    classText: "#0f172a"
+    clusterBkg: "transparent"
+    clusterBorder: "#94a3b8"
+    titleColor: "#64748b"
+    edgeLabelBackground: "#ffffff"
+  themeCSS: >
+    svg, .label, .nodeLabel, .edgeLabel, foreignObject div { font-family: Arial, Helvetica, sans-serif; }
+    .node rect, .node polygon, .node path {
+      filter: drop-shadow(0 3px 6px rgba(15, 23, 42, 0.18));
+    }
+    .node rect { rx: 14px; ry: 14px; }
+    .cluster rect { rx: 18px; ry: 18px; }
+    .edgeLabel, .edgeLabel p, .edgeLabel span {
+      background: #ffffff; color: #475569; border-radius: 999px;
+    }
+    .edgeLabel p { padding: 3px 10px; }
+    .labelBkg { background: transparent !important; fill: none !important; }
+---
+flowchart TB
+    Header("<b>TIFF header</b><br/>little-endian")
+
+    subgraph IFD0["IFD 0"]
+        Thumb("<b>Thumbnail</b><br/>256 pixels, RGB")
+        Tags0("<b>The whole file's tags</b><br/>DNGVersion 1.4, UniqueCameraModel<br/>ColorMatrix1 + D65, AsShotNeutral<br/>BaselineExposure ..., Orientation<br/>DNGPrivateData: the maker note")
+    end
+
+    Raw[("<b>SubIFD 0: the raw image</b><br/>CFA: the whole frame, ActiveArea<br/>or LinearRaw, 16 bits<br/>256x256 tiles, lossless JPEG<br/>BlackLevel, WhiteLevel, DefaultCrop<br/>OpcodeList1, with --repair opcode")]
+    Preview("<b>SubIFD 1</b><br/>the camera's JPEG")
+    Exif("<b>EXIF</b><br/>the original's, plus<br/>LensModel, LensSpecification")
+    Gps("<b>GPS</b><br/>when the original has it")
+
+    Header --> IFD0
+    IFD0 ==> Raw
+    IFD0 --> Preview
+    IFD0 --> Exif
+    IFD0 --> Gps
+
+    classDef data  fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a8a
+    classDef hero  fill:#2563eb,stroke:#1e3a8a,stroke-width:2px,color:#ffffff
+    classDef ext   fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+
+    class Header ext
+    class Thumb,Tags0,Preview,Exif,Gps data
+    class Raw hero
+
+    style IFD0 fill:#3b82f612,stroke:#3b82f6,stroke-width:1.5px,stroke-dasharray:6 5,color:#2563eb
+
+    linkStyle 0,2,3,4 stroke:#3b82f6,stroke-width:2px
+    linkStyle 1 stroke:#3b82f6,stroke-width:3px

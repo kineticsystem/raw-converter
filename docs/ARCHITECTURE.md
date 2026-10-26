@@ -46,76 +46,8 @@ Both come from the same `RawImage`, so they show the same pixels, repaired the s
 
 A conversion is a pipeline of five steps around one data model, `RawImage`. Each step is behind an interface, so any of them can be replaced: by a fake in the tests, or by an application that keeps its files somewhere else.
 
-```mermaid
----
-config:
-  theme: base
-  themeCSS: ".edgeLabel p { padding: 4px 10px; }"
-  flowchart:
-    padding: 20
-    nodeSpacing: 40
-    rankSpacing: 50
-  class:
-    padding: 16
-  sequence:
-    boxMargin: 12
-    boxTextMargin: 8
-    noteMargin: 28
-    messageMargin: 40
-    actorMargin: 60
-    labelBoxWidth: 56
-    labelBoxHeight: 28
-  themeVariables:
-    primaryColor: "#3b6fb6"
-    primaryTextColor: "#ffffff"
-    primaryBorderColor: "#2c5590"
-    lineColor: "#8b949e"
-    textColor: "#4d86d6"
-    actorBkg: "#3b6fb6"
-    actorBorder: "#2c5590"
-    actorTextColor: "#ffffff"
-    actorLineColor: "#8b949e"
-    signalColor: "#8b949e"
-    signalTextColor: "#4d86d6"
-    noteBkgColor: "#3b6fb6"
-    noteTextColor: "#ffffff"
-    noteBorderColor: "#2c5590"
-    secondaryColor: "#3b6fb6"
-    tertiaryColor: "#3b6fb6"
-    clusterBkg: "transparent"
-    clusterBorder: "#8b949e"
-    titleColor: "#4d86d6"
-    edgeLabelBackground: "#3b6fb6"
-    classText: "#ffffff"
-    labelBoxBkgColor: "#3b6fb6"
-    labelBoxBorderColor: "#2c5590"
-    labelTextColor: "#ffffff"
-    loopTextColor: "#4d86d6"
-    mainBkg: "#3b6fb6"
-    nodeBorder: "#2c5590"
-    nodeTextColor: "#ffffff"
-    secondaryBorderColor: "#2c5590"
-    secondaryTextColor: "#ffffff"
-    tertiaryBorderColor: "#2c5590"
-    tertiaryTextColor: "#ffffff"
-    errorBkgColor: "#3b6fb6"
-    errorTextColor: "#ffffff"
----
-flowchart TB
-    In["CR2 file<br/>or bytes in memory"] --> Read["FileStore<br/>read"]
-    Read --> Decode["RawDecoder<br/>LibRaw + TIFF reader<br/>+ CameraTable"]
-    Decode --> Image["RawImage"]
-    Image --> Detect["BadPixelDetector"]
-    Detect --> Map["DefectMap<br/>per camera body"]
-    Map --> Repair["repair<br/>interpolate or opcode"]
-    Repair --> Encode["DngEncoder<br/>TIFF writer + lossless JPEG<br/>+ thumbnail"]
-    Repair --> Render["TiffEncoder<br/>renderImage: LibRaw<br/>+ ICC profile"]
-    Encode --> Write["FileStore<br/>write, atomically"]
-    Render --> Write
-    Write --> Out["DNG file, TIFF file or both"]
-
-    classDef default fill:#3b6fb6,stroke:#2c5590,color:#ffffff
-```
+<!-- The source is diagrams/pipeline.mmd: change it, then run bin/render-diagrams.sh. -->
+<p align="center"><img src="diagrams/pipeline.svg" alt="A CR2 file, or bytes in memory, is read by FileStore and decoded by RawDecoder into a RawImage; BadPixelDetector finds its bad pixels, recorded in the DefectMap of the camera body, which repair interpolates or turns into an opcode; DngEncoder and TiffEncoder encode it, and FileStore writes the DNG file, the TIFF file or both, atomically." width="528"></p>
 
 `Converter` runs the pipeline, one file per thread, and encodes each image as the format asks: DNG, TIFF or both. In `BATCH` mode it first decodes every file, to learn each camera's defects, then converts them all: see [Bad Pixels](#bad-pixels). The command line tool, `raw-convert`, only parses its arguments, lists the files and prints the results. Everything else is in the library, `librawconv`, which a bigger application links in the same way.
 
@@ -144,110 +76,13 @@ The public headers are under `include/rawconv`, and `rawconv.hpp` includes them 
 
 ## The Classes
 
-```mermaid
----
-config:
-  theme: base
-  themeCSS: ".edgeLabel p { padding: 4px 10px; }"
-  flowchart:
-    padding: 20
-    nodeSpacing: 40
-    rankSpacing: 50
-  class:
-    padding: 16
-  sequence:
-    boxMargin: 12
-    boxTextMargin: 8
-    noteMargin: 28
-    messageMargin: 40
-    actorMargin: 60
-    labelBoxWidth: 56
-    labelBoxHeight: 28
-  themeVariables:
-    primaryColor: "#3b6fb6"
-    primaryTextColor: "#ffffff"
-    primaryBorderColor: "#2c5590"
-    lineColor: "#8b949e"
-    textColor: "#4d86d6"
-    actorBkg: "#3b6fb6"
-    actorBorder: "#2c5590"
-    actorTextColor: "#ffffff"
-    actorLineColor: "#8b949e"
-    signalColor: "#8b949e"
-    signalTextColor: "#4d86d6"
-    noteBkgColor: "#3b6fb6"
-    noteTextColor: "#ffffff"
-    noteBorderColor: "#2c5590"
-    secondaryColor: "#3b6fb6"
-    tertiaryColor: "#3b6fb6"
-    clusterBkg: "transparent"
-    clusterBorder: "#8b949e"
-    titleColor: "#4d86d6"
-    edgeLabelBackground: "#3b6fb6"
-    classText: "#ffffff"
-    labelBoxBkgColor: "#3b6fb6"
-    labelBoxBorderColor: "#2c5590"
-    labelTextColor: "#ffffff"
-    loopTextColor: "#4d86d6"
-    mainBkg: "#3b6fb6"
-    nodeBorder: "#2c5590"
-    nodeTextColor: "#ffffff"
-    secondaryBorderColor: "#2c5590"
-    secondaryTextColor: "#ffffff"
-    tertiaryBorderColor: "#2c5590"
-    tertiaryTextColor: "#ffffff"
-    errorBkgColor: "#3b6fb6"
-    errorTextColor: "#ffffff"
----
-classDiagram
-    class RawDecoder {
-        <<interface>>
-        decode(bytes, name) RawImage
-    }
-    class BadPixelDetector {
-        <<interface>>
-        detect(image) BadPixelCandidates
-    }
-    class DngEncoder {
-        <<interface>>
-        encode(image, options) bytes
-    }
-    class TiffEncoder {
-        <<interface>>
-        encode(image, options) bytes
-    }
-    class FileStore {
-        <<interface>>
-        read(path) bytes
-        write(path, bytes)
-        exists(path) bool
-    }
-    class Converter {
-        convert(jobs, progress) results
-        convertFile(input, output) result
-        repair(image) count
-        cancel()
-        defectMap() DefectMap
-    }
-    class DefectMap {
-        addShot(camera, candidates, scene)
-        confirmed(camera) pixels
-        read(stream)
-        write(stream)
-    }
-    RawDecoder <|.. LibRawDecoder
-    BadPixelDetector <|.. NoiseBadPixelDetector
-    DngEncoder <|.. StandardDngEncoder
-    TiffEncoder <|.. StandardTiffEncoder
-    FileStore <|.. LocalFileStore
-    LibRawDecoder o-- CameraTable : uses
-    Converter o-- RawDecoder : injected
-    Converter o-- BadPixelDetector : injected
-    Converter o-- DngEncoder : injected
-    Converter o-- TiffEncoder : injected
-    Converter o-- FileStore : injected
-    Converter *-- DefectMap : owns
-```
+<!-- The source is diagrams/classes.mmd: change it, then run bin/render-diagrams.sh. -->
+<p align="center"><img src="diagrams/classes.svg" alt="Converter has a RawDecoder, a BadPixelDetector, a DngEncoder, a TiffEncoder and a FileStore injected, each an interface, and owns the DefectMap." width="770"></p>
+
+Each interface has one real implementation; `LibRawDecoder` uses `CameraTable`:
+
+<!-- The source is diagrams/implementations.mmd: change it, then run bin/render-diagrams.sh. -->
+<p align="center"><img src="diagrams/implementations.svg" alt="LibRawDecoder implements RawDecoder and uses CameraTable, NoiseBadPixelDetector implements BadPixelDetector, StandardDngEncoder implements DngEncoder, StandardTiffEncoder implements TiffEncoder and LocalFileStore implements FileStore." width="638"></p>
 
 ### RawImage
 
@@ -413,74 +248,8 @@ The real implementations are tested end to end instead, on real raw files, and c
 
 ## The DNG File
 
-```mermaid
----
-config:
-  theme: base
-  themeCSS: ".edgeLabel p { padding: 4px 10px; }"
-  flowchart:
-    padding: 20
-    nodeSpacing: 40
-    rankSpacing: 50
-  class:
-    padding: 16
-  sequence:
-    boxMargin: 12
-    boxTextMargin: 8
-    noteMargin: 28
-    messageMargin: 40
-    actorMargin: 60
-    labelBoxWidth: 56
-    labelBoxHeight: 28
-  themeVariables:
-    primaryColor: "#3b6fb6"
-    primaryTextColor: "#ffffff"
-    primaryBorderColor: "#2c5590"
-    lineColor: "#8b949e"
-    textColor: "#4d86d6"
-    actorBkg: "#3b6fb6"
-    actorBorder: "#2c5590"
-    actorTextColor: "#ffffff"
-    actorLineColor: "#8b949e"
-    signalColor: "#8b949e"
-    signalTextColor: "#4d86d6"
-    noteBkgColor: "#3b6fb6"
-    noteTextColor: "#ffffff"
-    noteBorderColor: "#2c5590"
-    secondaryColor: "#3b6fb6"
-    tertiaryColor: "#3b6fb6"
-    clusterBkg: "transparent"
-    clusterBorder: "#8b949e"
-    titleColor: "#4d86d6"
-    edgeLabelBackground: "#3b6fb6"
-    classText: "#ffffff"
-    labelBoxBkgColor: "#3b6fb6"
-    labelBoxBorderColor: "#2c5590"
-    labelTextColor: "#ffffff"
-    loopTextColor: "#4d86d6"
-    mainBkg: "#3b6fb6"
-    nodeBorder: "#2c5590"
-    nodeTextColor: "#ffffff"
-    secondaryBorderColor: "#2c5590"
-    secondaryTextColor: "#ffffff"
-    tertiaryBorderColor: "#2c5590"
-    tertiaryTextColor: "#ffffff"
-    errorBkgColor: "#3b6fb6"
-    errorTextColor: "#ffffff"
----
-flowchart TB
-    Header["TIFF header, little-endian"] --> IFD0
-    subgraph IFD0["IFD 0: the thumbnail, and the whole file's tags"]
-        Thumb["256-pixel RGB thumbnail"]
-        Tags0["DNGVersion 1.4, UniqueCameraModel<br/>ColorMatrix1 + D65, AsShotNeutral<br/>BaselineExposure ..., Orientation<br/>DNGPrivateData: the maker note"]
-    end
-    IFD0 --> Raw["SubIFD 0: the raw image<br/>CFA: the whole frame, ActiveArea<br/>or LinearRaw, 16 bits<br/>256x256 tiles, lossless JPEG<br/>BlackLevel, WhiteLevel, DefaultCrop<br/>OpcodeList1, with --repair opcode"]
-    IFD0 --> Preview["SubIFD 1: the camera's JPEG"]
-    IFD0 --> Exif["EXIF: the original's, plus<br/>LensModel, LensSpecification"]
-    IFD0 --> Gps["GPS, when the original has it"]
-
-    classDef default fill:#3b6fb6,stroke:#2c5590,color:#ffffff
-```
+<!-- The source is diagrams/dng-file.mmd: change it, then run bin/render-diagrams.sh. -->
+<p align="center"><img src="diagrams/dng-file.svg" alt="The TIFF header leads to IFD 0, which holds the thumbnail and the tags of the whole file and leads to SubIFD 0, the raw image, SubIFD 1, the camera's JPEG, the EXIF of the original and the GPS, when the original has it." width="1011"></p>
 
 The file follows the [DNG 1.4 specification](https://helpx.adobe.com/camera-raw/digital-negative.html), the version Adobe DNG Converter writes:
 - `DNGBackwardVersion` is 1.1, or 1.3 when there is an opcode list.

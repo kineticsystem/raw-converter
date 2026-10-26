@@ -1,0 +1,102 @@
+---
+config:
+  theme: base
+  fontFamily: "Arial, Helvetica, sans-serif"
+  flowchart:
+    curve: basis
+    padding: 12
+    nodeSpacing: 46
+    rankSpacing: 26
+    subGraphTitleMargin:
+      top: 4
+      bottom: 10
+  class:
+    padding: 10
+  themeVariables:
+    lineColor: "#94a3b8"
+    textColor: "#64748b"
+    primaryColor: "#f1f5f9"
+    primaryBorderColor: "#64748b"
+    primaryTextColor: "#0f172a"
+    secondaryColor: "#f1f5f9"
+    secondaryBorderColor: "#64748b"
+    secondaryTextColor: "#0f172a"
+    tertiaryColor: "#f1f5f9"
+    tertiaryBorderColor: "#64748b"
+    tertiaryTextColor: "#0f172a"
+    mainBkg: "#f1f5f9"
+    nodeBorder: "#64748b"
+    nodeTextColor: "#0f172a"
+    classText: "#0f172a"
+    clusterBkg: "transparent"
+    clusterBorder: "#94a3b8"
+    titleColor: "#64748b"
+    edgeLabelBackground: "#ffffff"
+  themeCSS: >
+    svg, .label, .nodeLabel, .edgeLabel, foreignObject div { font-family: Arial, Helvetica, sans-serif; }
+    .node rect, .node polygon, .node path {
+      filter: drop-shadow(0 3px 6px rgba(15, 23, 42, 0.18));
+    }
+    .node rect { rx: 14px; ry: 14px; }
+    .cluster rect { rx: 18px; ry: 18px; }
+    .edgeLabel, .edgeLabel p, .edgeLabel span {
+      background: #ffffff; color: #475569; border-radius: 999px;
+    }
+    .edgeLabel p { padding: 3px 10px; }
+    .labelBkg { background: transparent !important; fill: none !important; }
+---
+flowchart TB
+    In(["<b>CR2 file</b><br/>or bytes in memory"])
+
+    subgraph ReadZone["READ&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"]
+        Read[("<b>FileStore</b><br/>read")]
+        Decode("<b>RawDecoder</b><br/>LibRaw + TIFF reader<br/>+ CameraTable")
+    end
+
+    Image{{"<b>RawImage</b>"}}
+
+    subgraph RepairZone["REPAIR&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"]
+        Detect("<b>BadPixelDetector</b>")
+        Map[("<b>DefectMap</b><br/>per camera body")]
+        Repair("<b>repair</b><br/>interpolate or opcode")
+    end
+
+    subgraph WriteZone["WRITE"]
+        Encode("<b>DngEncoder</b><br/>TIFF writer + lossless JPEG<br/>+ thumbnail")
+        Render("<b>TiffEncoder</b><br/>renderImage: LibRaw<br/>+ ICC profile")
+        Write[("<b>FileStore</b><br/>write, atomically")]
+    end
+
+    Out(["<b>DNG file, TIFF file or both</b>"])
+
+    In ==> Read
+    Read ==> Decode
+    Decode ==> Image
+    Image ==> Detect
+    Detect --> Map
+    Map --> Repair
+    Repair ==> Encode
+    Repair ==> Render
+    Encode ==> Write
+    Render ==> Write
+    Write ==> Out
+
+    classDef human fill:#ffe4e6,stroke:#e11d48,stroke-width:2px,color:#881337
+    classDef voice fill:#ccfbf1,stroke:#0d9488,stroke-width:2px,color:#134e4a
+    classDef mind  fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#4c1d95
+    classDef brain fill:#7c3aed,stroke:#5b21b6,stroke-width:2px,color:#ffffff
+    classDef data  fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a8a
+
+    class In,Out human
+    class Decode,Encode,Render voice
+    class Detect,Repair mind
+    class Image brain
+    class Read,Map,Write data
+
+    style ReadZone fill:#14b8a612,stroke:#14b8a6,stroke-width:1.5px,stroke-dasharray:6 5,color:#0d9488
+    style RepairZone fill:#8b5cf612,stroke:#8b5cf6,stroke-width:1.5px,stroke-dasharray:6 5,color:#7c3aed
+    style WriteZone fill:#14b8a612,stroke:#14b8a6,stroke-width:1.5px,stroke-dasharray:6 5,color:#0d9488
+
+    linkStyle 0,1,2,6,7,8,9,10 stroke:#14b8a6,stroke-width:3px
+    linkStyle 3 stroke:#8b5cf6,stroke-width:3px
+    linkStyle 4,5 stroke:#8b5cf6,stroke-width:2px

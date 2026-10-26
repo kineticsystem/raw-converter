@@ -23,3 +23,5 @@ jobs:
       - uses: pre-commit/action@v3.0.1
         with:
           extra_args: --all-files
+      - name: Check that every diagram is rendered from its source
+        run: bin/check-diagrams.sh
