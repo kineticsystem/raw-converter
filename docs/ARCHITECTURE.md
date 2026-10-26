@@ -77,7 +77,7 @@ The public headers are under `include/rawconv`, and `rawconv.hpp` includes them 
 ## The Classes
 
 <!-- The source is diagrams/classes.mmd: change it, then run bin/render-diagrams.sh. -->
-<p align="center"><img src="diagrams/classes.svg" alt="Converter has a RawDecoder, a BadPixelDetector, a DngEncoder, a TiffEncoder and a FileStore injected, each an interface, and owns the DefectMap." width="770"></p>
+<p align="center"><img src="diagrams/classes.svg" alt="Converter has a RawDecoder, a BadPixelDetector, a DngEncoder, a TiffEncoder and a FileStore injected, each an interface, and owns the DefectMap." width="710"></p>
 
 Each interface has one real implementation; `LibRawDecoder` uses `CameraTable`:
 

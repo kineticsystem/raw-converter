@@ -5,7 +5,7 @@ config:
   flowchart:
     curve: basis
     padding: 12
-    nodeSpacing: 46
+    nodeSpacing: 22
     rankSpacing: 32
     subGraphTitleMargin:
       top: 4
@@ -43,56 +43,26 @@ config:
       background: #ffffff; color: #475569; border-radius: 999px;
     }
     .edgeLabel p { padding: 3px 10px; }
+    .uml .nodeLabel { display: block; text-align: left; white-space: nowrap; }
+    .uml .nodeLabel hr { border: none; border-top: 1.5px solid currentColor; opacity: 0.45; margin: 7px -12px; }
+    .uml .nodeLabel .name { display: block; text-align: center; }
     .labelBkg { background: transparent !important; fill: none !important; }
 ---
-classDiagram
-    direction LR
-    class RawDecoder {
-        <<interface>>
-        decode(bytes, name) RawImage
-    }
-    class BadPixelDetector {
-        <<interface>>
-        detect(image) BadPixelCandidates
-    }
-    class DngEncoder {
-        <<interface>>
-        encode(image, options) bytes
-    }
-    class TiffEncoder {
-        <<interface>>
-        encode(image, options) bytes
-    }
-    class FileStore {
-        <<interface>>
-        read(path) bytes
-        write(path, bytes)
-        exists(path) bool
-    }
-    class Converter {
-        convert(jobs, progress) results
-        convertFile(input, output) result
-        repair(image) count
-        cancel()
-        defectMap() DefectMap
-    }
-    class DefectMap {
-        addShot(camera, candidates, scene)
-        confirmed(camera) pixels
-        read(stream)
-        write(stream)
-    }
-    Converter o-- RawDecoder : injected
-    Converter o-- BadPixelDetector : injected
-    Converter o-- DngEncoder : injected
-    Converter o-- TiffEncoder : injected
-    Converter o-- FileStore : injected
-    Converter *-- DefectMap : owns
-
-    style Converter fill:#7c3aed,stroke:#5b21b6,stroke-width:2px,color:#ffffff
-    style RawDecoder fill:#ccfbf1,stroke:#0d9488,stroke-width:2px,color:#134e4a
-    style BadPixelDetector fill:#ccfbf1,stroke:#0d9488,stroke-width:2px,color:#134e4a
-    style DngEncoder fill:#ccfbf1,stroke:#0d9488,stroke-width:2px,color:#134e4a
-    style TiffEncoder fill:#ccfbf1,stroke:#0d9488,stroke-width:2px,color:#134e4a
-    style FileStore fill:#ccfbf1,stroke:#0d9488,stroke-width:2px,color:#134e4a
-    style DefectMap fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a8a
+flowchart LR
+    Converter["<span class='name'><b>Converter</b></span><hr>convert(jobs, progress) : results<br>convertFile(input, output) : result<br>repair(image) : count<br>cancel()<br>defectMap() : DefectMap"]:::core
+    RawDecoder["<span class='name'>«interface»<br><b>RawDecoder</b></span><hr>decode(bytes, name) : RawImage"]:::iface
+    BadPixelDetector["<span class='name'>«interface»<br><b>BadPixelDetector</b></span><hr>detect(image) : BadPixelCandidates"]:::iface
+    DngEncoder["<span class='name'>«interface»<br><b>DngEncoder</b></span><hr>encode(image, options) : bytes"]:::iface
+    TiffEncoder["<span class='name'>«interface»<br><b>TiffEncoder</b></span><hr>encode(image, options) : bytes"]:::iface
+    FileStore["<span class='name'>«interface»<br><b>FileStore</b></span><hr>read(path) : bytes<br>write(path, bytes)<br>exists(path) : bool"]:::iface
+    DefectMap["<span class='name'><b>DefectMap</b></span><hr>addShot(camera, candidates, scene)<br>confirmed(camera) : pixels<br>read(stream)<br>write(stream)"]:::data
+    Converter -- injected --> RawDecoder
+    Converter -- injected --> BadPixelDetector
+    Converter -- injected --> DngEncoder
+    Converter -- injected --> TiffEncoder
+    Converter -- injected --> FileStore
+    Converter -- owns --> DefectMap
+    classDef core fill:#7c3aed,stroke:#5b21b6,stroke-width:2px,color:#ffffff
+    classDef iface fill:#ccfbf1,stroke:#0d9488,stroke-width:2px,color:#134e4a
+    classDef data fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a8a
+    class Converter,RawDecoder,BadPixelDetector,DngEncoder,TiffEncoder,FileStore,DefectMap uml
