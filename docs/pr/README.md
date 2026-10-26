@@ -7,7 +7,7 @@ Each pull request has a notes file here. It keeps what the pull request does not
 | Note | Pull request |
 |---|---|
 | [7-mermaid-diagrams.md](7-mermaid-diagrams.md) | [#7](https://github.com/kineticsystem/raw-converter/pull/7) Diagrams as SVG images, from Mermaid sources |
-| [8-class-diagram-compact.md](8-class-diagram-compact.md) | [#8](https://github.com/kineticsystem/raw-converter/pull/8) Class diagrams without empty compartments |
+| [8-class-diagram-compact.md](8-class-diagram-compact.md) | [#8](https://github.com/kineticsystem/raw-converter/pull/8) Implementations without empty compartments |
 
 ## How to Write One
 
